@@ -10,6 +10,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="assets/css/styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script defer src="assets/js/main.js"></script>
     <script defer src="assets/js/book.js"></script>
   </head>
@@ -146,15 +147,17 @@
                   Phone Number <span class="book-required">(Required)</span>
                 </label>
                 <div class="book-phone-row" role="group" aria-label="Phone number with country selector">
-                  <select class="book-phone-country" aria-label="Country" name="country">
-                    <option value="IN" selected>🇮🇳 India</option>
+                  <select class="book-phone-country" aria-label="Country code" name="phone_country_code" id="book-phone-country">
+                    <option value="+91" selected>🇮🇳 India</option>
                   </select>
                   <input id="book-phone" name="phone" class="book-control book-phone-input" inputmode="tel" autocomplete="tel" type="tel" required placeholder="e.g., 98xxxxxx" />
                 </div>
               </div>
 
+              <div class="book-form-message" id="book-form-message" role="status" aria-live="polite" hidden></div>
+
               <div class="book-form-actions">
-                <button type="button" class="book-primary-btn">
+                <button type="submit" class="book-primary-btn" id="book-submit-btn">
                   Request a Consultation
                   <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
                     <path fill="currentColor" d="M13 5l7 7-7 7-1.4-1.4 4.6-4.6H4v-2h12.2l-4.6-4.6L13 5z"/>
