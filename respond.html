@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Respond to Offer | ABI Parent Care</title>
+    <meta name="description" content="Confirm acceptance or decline of a helper appointment offer." />
+    <link rel="icon" href="assets/img/logo.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="assets/css/styles.css" />
+    <script defer src="assets/js/main.js"></script>
+    <script defer src="assets/js/respond.js"></script>
+  </head>
+  <body class="book-page">
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <header class="topbar">
+      <div class="container">
+        <nav class="nav" aria-label="Primary">
+          <a class="brand" href="index.html" aria-label="ABI Parent Care home">
+            <svg class="brand-icon" viewBox="0 0 48 48" aria-hidden="true">
+              <path fill="#1d6fd8" d="M24 42l-2.5-2.2C11 32.8 6 28.5 6 22c0-5 4-9 9-9 2.2 0 4.2.9 5.6 2.3 1.4-1.4 3.4-2.3 5.6-2.3 5 0 9 4 9 9 0 6.5-5 10.8-15.5 17.8L24 42z"/>
+              <path stroke="#4a9cf7" stroke-width="2" stroke-linecap="round" fill="none" d="M24 20v16M18 28h12"/>
+            </svg>
+            <span class="brand-text"><strong>ABI</strong><br /><span>PARENT CARE</span></span>
+          </a>
+          <div class="navlinks" data-navlinks>
+            <a data-nav href="index.html">Home</a>
+            <a data-nav href="about.html">About Us</a>
+            <a data-nav href="services.html">Services</a>
+            <a data-nav href="plans.html">Plans</a>
+            <a data-nav href="how-it-works.html">How it Works</a>
+            <a data-nav href="trust-safety.html">Trust &amp; Safety</a>
+            <a data-nav href="faq.html">FAQ</a>
+          </div>
+          <div class="nav-cta">
+            <button class="menu-btn" type="button" aria-label="Open menu" aria-expanded="false" data-menu-button>
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path fill="currentColor" d="M4 6h16v2H4V6Zm0 5h16v2H4v-2Zm0 5h16v2H4v-2Z"/>
+              </svg>
+            </button>
+            <a class="btn book-nav-btn" href="book.html">
+              Book a Consultation
+              <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+                <path fill="currentColor" d="M13 5l7 7-7 7-1.4-1.4 4.6-4.6H4v-2h12.2l-4.6-4.6L13 5z"/>
+              </svg>
+            </a>
+          </div>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="book-hero">
+        <div class="book-hero-bg" aria-hidden="true"></div>
+        <div class="container">
+          <div class="book-hero-inner">
+            <div class="book-hero-content">
+              <div class="book-form-card" style="max-width: 560px; margin: 0 auto;">
+                <h1 id="respond-title">Respond to offer</h1>
+                <p id="respond-detail" class="book-field-hint">
+                  Open this page from your offer email, then confirm your choice.
+                </p>
+
+                <div class="book-form-message" id="respond-message" role="status" aria-live="polite" hidden></div>
+
+                <div class="book-form-actions" id="respond-actions">
+                  <button type="button" class="book-primary-btn" id="respond-confirm-btn">
+                    Confirm
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="book-footer" role="contentinfo">
+      <div class="book-footer-bg" aria-hidden="true"></div>
+      <div class="container">
+        <div class="book-footer-inner">
+          <div class="book-footer-left">
+            <div class="book-footer-logo-row">
+              <svg class="book-footer-logo" viewBox="0 0 48 48" aria-hidden="true">
+                <path fill="#1d6fd8" d="M24 42l-2.5-2.2C11 32.8 6 28.5 6 22c0-5 4-9 9-9 2.2 0 4.2.9 5.6 2.3 1.4-1.4 3.4-2.3 5.6-2.3 5 0 9 4 9 9 0 6.5-5 10.8-15.5 17.8L24 42z"/>
+                <path stroke="#4a9cf7" stroke-width="2" stroke-linecap="round" fill="none" d="M24 20v16M18 28h12"/>
+              </svg>
+              <span class="book-footer-logo-text">
+                <strong>ABI</strong>
+                <span>PARENT CARE</span>
+              </span>
+            </div>
+            <p class="book-footer-left-copy">On-demand, non-emergency support services for elderly parents in india.</p>
+          </div>
+
+          <nav class="book-footer-nav" aria-label="Footer">
+            <a href="index.html">Home</a>
+            <a href="about.html">About Us</a>
+            <a href="services.html">Services</a>
+            <a href="plans.html">Plans</a>
+            <a href="faq.html">FAQ</a>
+            <a href="book.html">Book</a>
+          </nav>
+        </div>
+        <p class="book-footer-copy">© 2016, ABI Parent Care. All rights reserved.</p>
+      </div>
+    </footer>
+  </body>
+</html>
