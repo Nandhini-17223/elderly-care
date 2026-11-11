@@ -10,7 +10,82 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="assets/css/styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script defer src="assets/js/main.js"></script>
+    <style>
+      .consultation {
+        padding: 4rem 0;
+        background:
+          radial-gradient(circle at top left, rgba(74, 156, 247, 0.18), transparent 45%),
+          linear-gradient(180deg, #f7fbff 0%, #eef5fc 100%);
+      }
+      .consultation .container { max-width: 720px; margin: 0 auto; padding: 0 1.25rem; }
+      .consultation-title {
+        font-size: clamp(1.75rem, 3vw, 2.25rem);
+        color: #0f2f57;
+        margin: 0 0 0.5rem;
+        text-align: center;
+      }
+      .consultation-sub {
+        text-align: center;
+        color: #4b6482;
+        margin: 0 0 2rem;
+      }
+      .consultation-form {
+        display: grid;
+        gap: 1rem;
+      }
+      .consultation-form .field { display: grid; gap: 0.35rem; }
+      .consultation-form label { font-weight: 600; color: #16375f; font-size: 0.95rem; }
+      .consultation-form input,
+      .consultation-form select {
+        width: 100%;
+        border: 1px solid #c7d7ea;
+        border-radius: 10px;
+        padding: 0.75rem 0.9rem;
+        font: inherit;
+        background: #fff;
+        color: #16375f;
+        box-sizing: border-box;
+      }
+      .consultation-form input:focus,
+      .consultation-form select:focus {
+        outline: 2px solid #4a9cf7;
+        outline-offset: 1px;
+      }
+      .phone-row {
+        display: grid;
+        grid-template-columns: 140px 1fr;
+        gap: 0.75rem;
+      }
+      .consultation-form .btn {
+        justify-self: start;
+        margin-top: 0.5rem;
+        cursor: pointer;
+        border: 0;
+      }
+      .consultation-form .btn[disabled] { opacity: 0.7; cursor: wait; }
+      .form-message {
+        margin-top: 1rem;
+        padding: 0.9rem 1rem;
+        border-radius: 10px;
+        display: none;
+      }
+      .form-message.is-visible { display: block; }
+      .form-message.is-success {
+        background: #e8f7ee;
+        color: #146c2e;
+        border: 1px solid #b7e4c7;
+      }
+      .form-message.is-error {
+        background: #fdecec;
+        color: #9b1c1c;
+        border: 1px solid #f5c2c2;
+      }
+      @media (max-width: 600px) {
+        .phone-row { grid-template-columns: 1fr; }
+      }
+    </style>
   </head>
   <body class="home-page">
     <a class="skip-link" href="#main">Skip to content</a>
@@ -40,7 +115,7 @@
             <button class="menu-btn" type="button" aria-label="Open menu" aria-expanded="false" data-menu-button>
               <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M4 6h16v2H4V6Zm0 5h16v2H4v-2Zm0 5h16v2H4v-2Z"/></svg>
             </button>
-            <a class="btn btn-primary" href="book.html">Book a Consultation <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M13 5l7 7-7 7-1.4-1.4 4.6-4.6H4v-2h12.2l-4.6-4.6L13 5z"/></svg></a>
+            <a class="btn btn-primary" href="#request-consultation">Book a Consultation <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M13 5l7 7-7 7-1.4-1.4 4.6-4.6H4v-2h12.2l-4.6-4.6L13 5z"/></svg></a>
           </div>
         </nav>
       </div>
@@ -57,7 +132,7 @@
               </h1>
               <p class="hero-sub">Stay connected with our trusted care for your beloved parents.</p>
               <div class="hero-cta">
-                <a class="btn btn-primary" href="book.html">Book a Consultation <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M13 5l7 7-7 7-1.4-1.4 4.6-4.6H4v-2h12.2l-4.6-4.6L13 5z"/></svg></a>
+                <a class="btn btn-primary" href="#request-consultation">Book a Consultation <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M13 5l7 7-7 7-1.4-1.4 4.6-4.6H4v-2h12.2l-4.6-4.6L13 5z"/></svg></a>
                 <a class="btn btn-outline" href="plans.html">View Plans</a>
               </div>
               <div class="hero-stats">
@@ -220,12 +295,74 @@
         </div>
       </section>
 
+      <section class="consultation" id="request-consultation" aria-labelledby="consultation-heading">
+        <div class="container">
+          <h2 class="consultation-title" id="consultation-heading">Request a Consultation</h2>
+          <p class="consultation-sub">Tell us about your parent and how we can help. A care advisor will follow up within 24 hours.</p>
+          <form class="consultation-form" id="consultation-form" novalidate>
+            <div class="field">
+              <label for="parent_name">Parent’s Name</label>
+              <input id="parent_name" name="parent_name" type="text" autocomplete="name" required />
+            </div>
+            <div class="field">
+              <label for="parent_age">Age</label>
+              <input id="parent_age" name="parent_age" type="number" min="1" max="120" required />
+            </div>
+            <div class="field">
+              <label for="city">Current City</label>
+              <input id="city" name="city" type="text" autocomplete="address-level2" required />
+            </div>
+            <div class="field">
+              <label for="booking_person_name">Your Name (booking person)</label>
+              <input id="booking_person_name" name="booking_person_name" type="text" autocomplete="name" required />
+            </div>
+            <div class="field">
+              <label for="relationship">Relationship to Parent</label>
+              <select id="relationship" name="relationship" required>
+                <option value="">Select relationship</option>
+                <option value="Son">Son</option>
+                <option value="Daughter">Daughter</option>
+                <option value="Spouse">Spouse</option>
+                <option value="Sibling">Sibling</option>
+                <option value="Relative">Relative</option>
+                <option value="Friend">Friend</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="email">Email Address</label>
+              <input id="email" name="email" type="email" autocomplete="email" required />
+            </div>
+            <div class="field">
+              <label for="phone">Phone Number</label>
+              <div class="phone-row">
+                <select id="phone_country_code" name="phone_country_code" aria-label="Country code" required>
+                  <option value="+91" selected>🇮🇳 +91</option>
+                  <option value="+1">🇺🇸 +1</option>
+                  <option value="+44">🇬🇧 +44</option>
+                  <option value="+971">🇦🇪 +971</option>
+                  <option value="+65">🇸🇬 +65</option>
+                  <option value="+61">🇦🇺 +61</option>
+                  <option value="+49">🇩🇪 +49</option>
+                  <option value="+33">🇫🇷 +33</option>
+                </select>
+                <input id="phone" name="phone" type="tel" autocomplete="tel-national" inputmode="tel" required />
+              </div>
+            </div>
+            <button class="btn btn-primary" type="submit" id="consultation-submit">
+              Request a Consultation
+            </button>
+            <div class="form-message" id="consultation-message" role="status" aria-live="polite"></div>
+          </form>
+        </div>
+      </section>
+
       <footer class="footer">
         <div class="footer-cta-band">
           <div class="container">
             <h2 class="footer-cta-title">Ensure Your Parents Are Always Cared For</h2>
             <div class="footer-cta-btns">
-              <a class="btn btn-primary" href="book.html">Book a Consultation <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M13 5l7 7-7 7-1.4-1.4 4.6-4.6H4v-2h12.2l-4.6-4.6L13 5z"/></svg></a>
+              <a class="btn btn-primary" href="#request-consultation">Book a Consultation <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M13 5l7 7-7 7-1.4-1.4 4.6-4.6H4v-2h12.2l-4.6-4.6L13 5z"/></svg></a>
               <a class="btn btn-phone" href="tel:+917339911220"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg> +91 73399 11220</a>
             </div>
           </div>
@@ -270,5 +407,101 @@
       </footer>
     </main>
 
+    <script>
+      (function () {
+        const SUPABASE_URL = "https://vzmhcqhcvflylmobpvap.supabase.co";
+        const SUPABASE_ANON_KEY =
+          "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6bWhjcWhjdmZseWxtb2JwdmFwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMxNjQ1MDMsImV4cCI6MjEwODc0MDUwM30.hGkhLLJ9pmtVbfLaGv5PXnkuZIwXZe9pMbVUGBiKOKw";
+
+        const form = document.getElementById("consultation-form");
+        const messageEl = document.getElementById("consultation-message");
+        const submitBtn = document.getElementById("consultation-submit");
+
+        if (!form || !window.supabase) {
+          return;
+        }
+
+        const supabaseClient = window.supabase.createClient(
+          SUPABASE_URL,
+          SUPABASE_ANON_KEY
+        );
+
+        function showMessage(text, type) {
+          messageEl.textContent = text;
+          messageEl.className = "form-message is-visible is-" + type;
+        }
+
+        function clearMessage() {
+          messageEl.textContent = "";
+          messageEl.className = "form-message";
+        }
+
+        form.addEventListener("submit", async function (event) {
+          event.preventDefault();
+          clearMessage();
+
+          if (!form.checkValidity()) {
+            form.reportValidity();
+            showMessage("Please fill in all required fields.", "error");
+            return;
+          }
+
+          const parentAge = Number(form.parent_age.value);
+          if (!Number.isInteger(parentAge) || parentAge < 1 || parentAge > 120) {
+            showMessage("Please enter a valid age between 1 and 120.", "error");
+            return;
+          }
+
+          const payload = {
+            parent_name: form.parent_name.value.trim(),
+            parent_age: parentAge,
+            city: form.city.value.trim(),
+            booking_person_name: form.booking_person_name.value.trim(),
+            relationship: form.relationship.value.trim(),
+            email: form.email.value.trim(),
+            phone_country_code: form.phone_country_code.value.trim(),
+            phone: form.phone.value.trim(),
+          };
+
+          const requiredFilled = Object.values(payload).every(function (value) {
+            return value !== "" && value !== null && value !== undefined;
+          });
+
+          if (!requiredFilled) {
+            showMessage("Please fill in all required fields.", "error");
+            return;
+          }
+
+          submitBtn.disabled = true;
+          submitBtn.textContent = "Submitting…";
+
+          try {
+            const { error } = await supabaseClient
+              .from("consultation_requests")
+              .insert([payload]);
+
+            if (error) {
+              throw error;
+            }
+
+            form.reset();
+            form.phone_country_code.value = "+91";
+            showMessage(
+              "Thank you! Your consultation request has been received. Our care advisor will contact you within 24 hours.",
+              "success"
+            );
+          } catch (err) {
+            console.error(err);
+            showMessage(
+              "Sorry, we could not submit your request. Please try again or call us.",
+              "error"
+            );
+          } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = "Request a Consultation";
+          }
+        });
+      })();
+    </script>
   </body>
 </html>
