@@ -3,6 +3,7 @@
   const SUPABASE_ANON_KEY =
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6bWhjcWhjdmZseWxtb2JwdmFwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMxNjQ1MDMsImV4cCI6MjEwODc0MDUwM30.hGkhLLJ9pmtVbfLaGv5PXnkuZIwXZe9pMbVUGBiKOKw";
   const IST_TIME_ZONE = "Asia/Kolkata";
+  const PINCODE_PATTERN = /^\d{6}$/;
 
   const SUBMIT_LABEL_HTML =
     'Request a Consultation<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M13 5l7 7-7 7-1.4-1.4 4.6-4.6H4v-2h12.2l-4.6-4.6L13 5z"/></svg>';
@@ -52,6 +53,10 @@
 
   function isValidEmail(email) {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  }
+
+  function isValidPincode(pincode) {
+    return PINCODE_PATTERN.test(pincode);
   }
 
   function getIstParts(date) {
@@ -110,6 +115,13 @@
     );
   }
 
+  function isPincodeDbError(err) {
+    const message = String(
+      (err && (err.message || err.details || err.hint)) || ""
+    ).toLowerCase();
+    return message.indexOf("pincode") !== -1;
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
     const form = qs("#book-form");
     const messageEl = qs("#book-form-message");
@@ -118,6 +130,7 @@
     const appointmentTimeEl = qs("#book-appointment-time", form);
     const appointmentDateErrorEl = qs("#book-appointment-date-error", form);
     const appointmentTimeErrorEl = qs("#book-appointment-time-error", form);
+    const pincodeErrorEl = qs("#book-pincode-error", form);
 
     if (!form || !window.supabase) {
       return;
@@ -146,10 +159,16 @@
       clearMessage(messageEl);
       clearFieldError(appointmentDateErrorEl);
       clearFieldError(appointmentTimeErrorEl);
+      clearFieldError(pincodeErrorEl);
 
       const parentNameEl = qs("#book-parent-name", form);
       const parentAgeEl = qs("#book-parent-age", form);
+      const addressLine1El = qs("#book-address-line1", form);
+      const streetEl = qs("#book-street", form);
+      const areaEl = qs("#book-area", form);
+      const landmarkEl = qs("#book-landmark", form);
       const cityEl = qs("#book-city", form);
+      const pincodeEl = qs("#book-pincode", form);
       const contactNameEl = qs("#book-contact-name", form);
       const relationshipEl = qs("#book-relationship", form);
       const emailEl = qs("#book-email", form);
@@ -161,7 +180,12 @@
       const parent_name = safeTrim(parentNameEl && parentNameEl.value);
       const parentAgeRaw = safeTrim(parentAgeEl && parentAgeEl.value);
       const parent_age = Number(parentAgeRaw);
+      const address_line1 = safeTrim(addressLine1El && addressLine1El.value);
+      const street = safeTrim(streetEl && streetEl.value);
+      const area = safeTrim(areaEl && areaEl.value);
+      const landmark = safeTrim(landmarkEl && landmarkEl.value);
       const city = safeTrim(cityEl && cityEl.value);
+      const pincode = safeTrim(pincodeEl && pincodeEl.value);
       const booking_person_name = safeTrim(contactNameEl && contactNameEl.value);
       const relationship = safeTrim(relationshipEl && relationshipEl.value);
       const email = safeTrim(emailEl && emailEl.value);
@@ -188,7 +212,27 @@
           ok: Number.isInteger(parent_age) && parent_age > 0 && parent_age < 150,
           msg: "Please enter a valid age between 1 and 149.",
         },
+        {
+          el: addressLine1El,
+          ok: Boolean(address_line1),
+          msg: "Please enter the house / flat number.",
+        },
+        {
+          el: streetEl,
+          ok: Boolean(street),
+          msg: "Please enter the street / road.",
+        },
+        {
+          el: areaEl,
+          ok: Boolean(area),
+          msg: "Please enter the area / locality.",
+        },
         { el: cityEl, ok: Boolean(city), msg: "Please enter the current city." },
+        {
+          el: pincodeEl,
+          ok: isValidPincode(pincode),
+          msg: "Please enter a valid 6-digit pincode.",
+        },
         {
           el: contactNameEl,
           ok: Boolean(booking_person_name),
@@ -230,6 +274,9 @@
       });
 
       if (firstProblem) {
+        if (firstProblem.el === pincodeEl) {
+          showFieldError(pincodeErrorEl, firstProblem.msg);
+        }
         showMessage(messageEl, firstProblem.msg, "error");
         firstProblem.el && firstProblem.el.focus && firstProblem.el.focus();
         return;
@@ -273,7 +320,12 @@
       const payload = {
         parent_name: parent_name,
         parent_age: parent_age,
+        address_line1: address_line1,
+        street: street,
+        area: area,
+        landmark: landmark || null,
         city: city,
+        pincode: pincode,
         booking_person_name: booking_person_name,
         relationship: relationship,
         email: email,
@@ -306,7 +358,12 @@
         [
           parentNameEl,
           parentAgeEl,
+          addressLine1El,
+          streetEl,
+          areaEl,
+          landmarkEl,
           cityEl,
+          pincodeEl,
           contactNameEl,
           relationshipEl,
           emailEl,
@@ -320,6 +377,7 @@
         });
         clearFieldError(appointmentDateErrorEl);
         clearFieldError(appointmentTimeErrorEl);
+        clearFieldError(pincodeErrorEl);
 
         showMessage(
           messageEl,
@@ -342,6 +400,18 @@
           appointmentTimeEl &&
             appointmentTimeEl.focus &&
             appointmentTimeEl.focus();
+        } else if (isPincodeDbError(err)) {
+          setInvalid(pincodeEl, true);
+          showFieldError(
+            pincodeErrorEl,
+            "Please enter a valid 6-digit pincode."
+          );
+          showMessage(
+            messageEl,
+            "Please enter a valid 6-digit pincode.",
+            "error"
+          );
+          pincodeEl && pincodeEl.focus && pincodeEl.focus();
         } else {
           showMessage(
             messageEl,
