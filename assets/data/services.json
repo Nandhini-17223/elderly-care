@@ -1,0 +1,43 @@
+{
+  "disclaimer": "Abi’s Elderly Care provides non-emergency, non-critical support services only. We do not provide emergency response or critical medical services. If there is a medical emergency, call your local emergency number immediately (India: 112).",
+  "categories": [
+    {
+      "id": "hospital",
+      "title": "Hospital Accompaniment",
+      "summary": "A trained helper accompanies your parent for appointments, admissions, pharmacy runs, and discharge support.",
+      "includes": [
+        "Pickup and drop (as requested)",
+        "Queue assistance and guidance",
+        "Pharmacy/diagnostics coordination",
+        "Family updates (non-medical)"
+      ],
+      "excludes": [
+        "Emergency response",
+        "Critical medical care",
+        "Administering injections/IVs"
+      ]
+    },
+    {
+      "id": "shopping",
+      "title": "Shopping & Essentials",
+      "summary": "Groceries, medicines (pickup), and essentials delivered or assisted shopping based on preference.",
+      "includes": ["Grocery purchase assistance", "Home delivery support", "Bill confirmation and updates"],
+      "excludes": ["Handling controlled medications without prescription", "Emergency medicine delivery"]
+    },
+    {
+      "id": "bank",
+      "title": "Bank / Post Office Visits",
+      "summary": "Assistance with visits and paperwork guidance as a companion (not a financial advisor).",
+      "includes": ["Accompaniment and queue assistance", "Form filling guidance", "Document checklist help"],
+      "excludes": ["Handling cash on behalf of client (unless explicitly approved)", "Signing on behalf of anyone"]
+    },
+    {
+      "id": "home_support",
+      "title": "Home Support & Companionship",
+      "summary": "Friendly companionship, tech help, reminders, and light support tasks.",
+      "includes": ["Companionship", "Light errands", "Basic tech assistance", "Family check-in updates"],
+      "excludes": ["Medical procedures", "Emergency care", "Heavy lifting or unsafe tasks"]
+    }
+  ]
+}
+
