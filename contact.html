@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Contact | Abi’s Elderly Care</title>
+    <meta name="description" content="Contact Abi’s Elderly Care for on-demand helper bookings and questions." />
+    <link rel="icon" href="assets/img/logo.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="assets/css/styles.css" />
+    <script defer src="assets/js/main.js"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <header class="topbar">
+      <div class="container">
+        <nav class="nav" aria-label="Primary">
+          <a class="brand" href="index.html" aria-label="ABI Parent Care home">
+            <svg class="brand-icon" viewBox="0 0 48 48" aria-hidden="true">
+              <path fill="#1d6fd8" d="M24 42l-2.5-2.2C11 32.8 6 28.5 6 22c0-5 4-9 9-9 2.2 0 4.2.9 5.6 2.3 1.4-1.4 3.4-2.3 5.6-2.3 5 0 9 4 9 9 0 6.5-5 10.8-15.5 17.8L24 42z"/>
+              <path stroke="#4a9cf7" stroke-width="2" stroke-linecap="round" fill="none" d="M24 20v16M18 28h12"/>
+            </svg>
+            <span class="brand-text"><strong>ABI</strong><br /><span>PARENT CARE</span></span>
+          </a>
+          <div class="nav-cta">
+            <button class="menu-btn" type="button" aria-label="Open menu" aria-expanded="false" data-menu-button>
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path fill="currentColor" d="M4 6h16v2H4V6Zm0 5h16v2H4v-2Zm0 5h16v2H4v-2Z"/>
+              </svg>
+            </button>
+            <a class="btn primary small" href="book.html">Book a Helper</a>
+          </div>
+          <div class="navlinks" data-navlinks>
+            <a data-nav href="index.html">Home</a>
+            <a data-nav href="services.html">Services</a>
+            <a data-nav href="plans.html">Pricing</a>
+            <a data-nav href="helpers.html">Helpers</a>
+            <a data-nav href="faq.html">FAQ</a>
+            <a data-nav href="about.html">About</a>
+            <a class="btn primary" href="book.html">Book a Helper</a>
+          </div>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="page-title">
+        <div class="container">
+          <span class="badge"><span class="dot" aria-hidden="true"></span>We respond quickly</span>
+          <h1>Contact</h1>
+          <p>
+            For booking requests, the fastest option is the <a href="book.html"><strong>booking form</strong></a>.
+            For urgent emergencies, call your local emergency number (India: 112).
+          </p>
+        </div>
+      </section>
+
+      <section class="section compact">
+        <div class="container">
+          <div class="grid cols-2">
+            <div class="card">
+              <h3>Booking & support</h3>
+              <ul class="list">
+                <li><strong>WhatsApp:</strong> +91 99999 99999 (placeholder)</li>
+                <li><strong>Email:</strong> support@abiselderlycare.com (placeholder)</li>
+                <li><strong>Hours:</strong> 9:00 AM – 8:00 PM IST (example)</li>
+              </ul>
+              <div class="hr"></div>
+              <div class="inline">
+                <a class="btn primary" href="book.html">Book a Helper</a>
+                <a class="btn" href="faq.html">Read FAQ</a>
+              </div>
+            </div>
+
+            <div class="card">
+              <h3>Coverage (example)</h3>
+              <p>Update the list in <code>assets/data/cities.json</code>.</p>
+              <ul class="list">
+                <li>Bengaluru</li>
+                <li>Chennai</li>
+                <li>Mumbai</li>
+                <li>Hyderabad</li>
+                <li>Delhi</li>
+              </ul>
+              <p class="hint">If you need a city not listed, contact us — we’ll confirm availability.</p>
+            </div>
+          </div>
+
+          <div class="hr"></div>
+
+          <div class="callout">
+            <strong>Emergency disclaimer</strong>
+            <div style="color: var(--muted)">
+              Abi’s Elderly Care does not provide emergency response or critical medical services. If there is an emergency, call your local
+              emergency number immediately (India: 112).
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer" role="contentinfo">
+      <div class="container">
+        <div class="cols">
+          <div>
+            <div class="title">Abi’s Elderly Care</div>
+            <div style="color: var(--muted)">On-demand, non-emergency support services for elderly parents in India.</div>
+            <div class="tiny">© <span id="y"></span> Abi’s Elderly Care. All rights reserved.</div>
+          </div>
+          <div>
+            <div class="title">Explore</div>
+            <div class="links">
+              <a href="services.html">Services</a>
+              <a href="plans.html">Pricing</a>
+              <a href="helpers.html">Helpers</a>
+              <a href="faq.html">FAQ</a>
+              <a href="about.html">About</a>
+            </div>
+          </div>
+          <div>
+            <div class="title">Legal</div>
+            <div class="links">
+              <a href="terms.html">Terms</a>
+              <a href="privacy.html">Privacy</a>
+              <a href="book.html"><strong>Book a Helper</strong></a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </footer>
+
+    <script>
+      document.getElementById("y").textContent = new Date().getFullYear();
+    </script>
+  </body>
+</html>
+

@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Privacy | Abi’s Elderly Care</title>
+    <meta name="description" content="Privacy policy for Abi’s Elderly Care booking requests and communications." />
+    <link rel="icon" href="assets/img/logo.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="assets/css/styles.css" />
+    <script defer src="assets/js/main.js"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <header class="topbar">
+      <div class="container">
+        <nav class="nav" aria-label="Primary">
+          <a class="brand" href="index.html" aria-label="ABI Parent Care home">
+            <svg class="brand-icon" viewBox="0 0 48 48" aria-hidden="true">
+              <path fill="#1d6fd8" d="M24 42l-2.5-2.2C11 32.8 6 28.5 6 22c0-5 4-9 9-9 2.2 0 4.2.9 5.6 2.3 1.4-1.4 3.4-2.3 5.6-2.3 5 0 9 4 9 9 0 6.5-5 10.8-15.5 17.8L24 42z"/>
+              <path stroke="#4a9cf7" stroke-width="2" stroke-linecap="round" fill="none" d="M24 20v16M18 28h12"/>
+            </svg>
+            <span class="brand-text"><strong>ABI</strong><br /><span>PARENT CARE</span></span>
+          </a>
+          <div class="nav-cta">
+            <button class="menu-btn" type="button" aria-label="Open menu" aria-expanded="false" data-menu-button>
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path fill="currentColor" d="M4 6h16v2H4V6Zm0 5h16v2H4v-2Zm0 5h16v2H4v-2Z"/>
+              </svg>
+            </button>
+            <a class="btn primary small" href="book.html">Book a Helper</a>
+          </div>
+          <div class="navlinks" data-navlinks>
+            <a data-nav href="index.html">Home</a>
+            <a data-nav href="services.html">Services</a>
+            <a data-nav href="plans.html">Pricing</a>
+            <a data-nav href="helpers.html">Helpers</a>
+            <a data-nav href="faq.html">FAQ</a>
+            <a data-nav href="about.html">About</a>
+            <a class="btn primary" href="book.html">Book a Helper</a>
+          </div>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="page-title">
+        <div class="container">
+          <span class="badge"><span class="dot" aria-hidden="true"></span>Privacy-first by design</span>
+          <h1>Privacy policy (draft)</h1>
+          <p>
+            This is a simple, practical policy for the MVP website. Customize it for your real data storage and compliance needs before going live.
+          </p>
+        </div>
+      </section>
+
+      <section class="section compact">
+        <div class="container">
+          <div class="grid cols-2">
+            <div class="card">
+              <h3>What we collect</h3>
+              <ul class="list">
+                <li>Contact info (name, phone, email)</li>
+                <li>Booking details (service type, city/area, date/time, duration)</li>
+                <li>Optional notes you provide (e.g., pickup location, hospital name)</li>
+              </ul>
+              <div class="hr"></div>
+              <h3>Why we collect it</h3>
+              <ul class="list">
+                <li>To confirm scope, availability, and pricing</li>
+                <li>To coordinate with helpers and provide updates</li>
+                <li>To improve service quality</li>
+              </ul>
+            </div>
+
+            <div class="card">
+              <h3>How the MVP site works</h3>
+              <p>
+                The booking form generates a structured WhatsApp message (and email fallback). Depending on your device/browser, this may open
+                WhatsApp/email apps and transmit the message through those providers.
+              </p>
+              <div class="hr"></div>
+              <h3>Local draft saving</h3>
+              <p>
+                To prevent losing your progress, the booking form may save a draft in your browser (localStorage). You can clear it anytime from the
+                booking page.
+              </p>
+              <p class="hint">Drafts are stored on your device, not on our servers (in the MVP).</p>
+            </div>
+          </div>
+
+          <div class="hr"></div>
+
+          <div class="card">
+            <h3>Sharing and retention</h3>
+            <ul class="list">
+              <li>We share only what’s needed to deliver the service (e.g., helper assignment details).</li>
+              <li>Retention periods depend on your operational setup. Specify exact timeframes here before launch.</li>
+              <li>You can request deletion of your data via the contact details below.</li>
+            </ul>
+            <div class="hr"></div>
+            <h3>Contact</h3>
+            <p style="color: var(--muted)">
+              For privacy requests, email: <strong>privacy@abiselderlycare.com</strong> (placeholder).
+            </p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer" role="contentinfo">
+      <div class="container">
+        <div class="cols">
+          <div>
+            <div class="title">Abi’s Elderly Care</div>
+            <div style="color: var(--muted)">On-demand, non-emergency support services for elderly parents in India.</div>
+            <div class="tiny">© <span id="y"></span> Abi’s Elderly Care. All rights reserved.</div>
+          </div>
+          <div>
+            <div class="title">Explore</div>
+            <div class="links">
+              <a href="services.html">Services</a>
+              <a href="plans.html">Pricing</a>
+              <a href="helpers.html">Helpers</a>
+              <a href="faq.html">FAQ</a>
+              <a href="about.html">About</a>
+            </div>
+          </div>
+          <div>
+            <div class="title">Legal</div>
+            <div class="links">
+              <a href="terms.html">Terms</a>
+              <a href="privacy.html">Privacy</a>
+              <a href="book.html"><strong>Book a Helper</strong></a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </footer>
+
+    <script>
+      document.getElementById("y").textContent = new Date().getFullYear();
+    </script>
+  </body>
+</html>
+
