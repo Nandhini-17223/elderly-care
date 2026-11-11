@@ -154,6 +154,44 @@
                 </div>
               </div>
 
+              <h3 class="book-subtitle">Appointment Details</h3>
+
+              <div class="book-grid-2">
+                <div class="book-field">
+                  <label for="book-appointment-date">
+                    Appointment Date <span class="book-required">(Required)</span>
+                  </label>
+                  <input id="book-appointment-date" name="appointmentDate" class="book-control" type="date" required />
+                  <div class="book-form-message" id="book-appointment-date-error" role="alert" hidden></div>
+                </div>
+
+                <div class="book-field">
+                  <label for="book-appointment-time">
+                    Appointment Time <span class="book-required">(Required)</span>
+                  </label>
+                  <input id="book-appointment-time" name="appointmentTime" class="book-control" type="time" required />
+                  <div class="book-form-message" id="book-appointment-time-error" role="alert" hidden></div>
+                </div>
+              </div>
+
+              <div class="book-field book-field--full">
+                <label for="book-doctor-hospital">
+                  Doctor / Hospital Name <span class="book-required">(Required)</span>
+                </label>
+                <input id="book-doctor-hospital" name="doctorHospital" class="book-control" type="text" autocomplete="organization" required />
+              </div>
+
+              <div class="book-field book-field--full">
+                <label for="book-helper-preference">
+                  Helper Preference <span class="book-required">(Required)</span>
+                </label>
+                <select id="book-helper-preference" name="helperPreference" class="book-control" required>
+                  <option value="any" selected>No preference</option>
+                  <option value="female">Female</option>
+                  <option value="male">Male</option>
+                </select>
+              </div>
+
               <div class="book-form-message" id="book-form-message" role="status" aria-live="polite" hidden></div>
 
               <div class="book-form-actions">
