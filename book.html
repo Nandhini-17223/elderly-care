@@ -95,7 +95,7 @@
       <section class="book-main">
         <div class="container">
           <div class="book-cards-grid">
-            <form class="book-form-card" id="book-form" aria-labelledby="book-form-title">
+            <form class="book-form-card" id="book-form" aria-labelledby="book-form-title" novalidate>
               <h2 id="book-form-title">Parent&apos;s Details</h2>
 
               <div class="book-grid-2">
@@ -104,13 +104,15 @@
                     Parent&apos;s Name <span class="book-required">(Required)</span>
                   </label>
                   <input id="book-parent-name" name="parentName" class="book-control" type="text" autocomplete="name" required />
+                  <div class="book-form-message" id="book-parent-name-error" role="alert" hidden></div>
                 </div>
 
                 <div class="book-field">
                   <label for="book-parent-age">
                     Age <span class="book-required">(Required)</span>
                   </label>
-                  <input id="book-parent-age" name="parentAge" class="book-control" type="number" inputmode="numeric" autocomplete="off" required />
+                  <input id="book-parent-age" name="parentAge" class="book-control" type="number" inputmode="numeric" min="40" max="120" autocomplete="off" required />
+                  <div class="book-form-message" id="book-parent-age-error" role="alert" hidden></div>
                 </div>
               </div>
 
@@ -122,6 +124,7 @@
                     House / Flat No. <span class="book-required">(Required)</span>
                   </label>
                   <input id="book-address-line1" name="addressLine1" class="book-control" type="text" autocomplete="address-line1" required />
+                  <div class="book-form-message" id="book-address-line1-error" role="alert" hidden></div>
                 </div>
 
                 <div class="book-field">
@@ -129,6 +132,7 @@
                     Street / Road <span class="book-required">(Required)</span>
                   </label>
                   <input id="book-street" name="street" class="book-control" type="text" autocomplete="address-line2" required />
+                  <div class="book-form-message" id="book-street-error" role="alert" hidden></div>
                 </div>
               </div>
 
@@ -138,6 +142,7 @@
                     Area / Locality <span class="book-required">(Required)</span>
                   </label>
                   <input id="book-area" name="area" class="book-control" type="text" autocomplete="address-level3" required />
+                  <div class="book-form-message" id="book-area-error" role="alert" hidden></div>
                 </div>
 
                 <div class="book-field">
@@ -152,13 +157,15 @@
                     Current City <span class="book-required">(Required)</span>
                   </label>
                   <input id="book-city" name="city" class="book-control" type="text" autocomplete="address-level2" required />
+                  <div class="book-form-message" id="book-city-error" role="alert" hidden></div>
                 </div>
 
                 <div class="book-field">
                   <label for="book-pincode">
                     Pincode <span class="book-required">(Required)</span>
                   </label>
-                  <input id="book-pincode" name="pincode" class="book-control" type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="postal-code" required />
+                  <input id="book-pincode" name="pincode" class="book-control" type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="postal-code" required aria-describedby="book-pincode-hint" />
+                  <div class="book-field-hint" id="book-pincode-hint">6-digit area pincode</div>
                   <div class="book-form-message" id="book-pincode-error" role="alert" hidden></div>
                 </div>
               </div>
@@ -167,13 +174,19 @@
 
               <div class="book-grid-2">
                 <div class="book-field">
-                  <label for="book-contact-name">Your Name (Booking Person)</label>
-                  <input id="book-contact-name" name="contactName" class="book-control" type="text" autocomplete="name" />
+                  <label for="book-contact-name">
+                    Your Name (Booking Person) <span class="book-required">(Required)</span>
+                  </label>
+                  <input id="book-contact-name" name="contactName" class="book-control" type="text" autocomplete="name" required />
+                  <div class="book-form-message" id="book-contact-name-error" role="alert" hidden></div>
                 </div>
 
                 <div class="book-field">
-                  <label for="book-relationship">Relationship to Parent</label>
-                  <input id="book-relationship" name="relationship" class="book-control" type="text" autocomplete="off" />
+                  <label for="book-relationship">
+                    Relationship to Parent <span class="book-required">(Required)</span>
+                  </label>
+                  <input id="book-relationship" name="relationship" class="book-control" type="text" autocomplete="off" required />
+                  <div class="book-form-message" id="book-relationship-error" role="alert" hidden></div>
                 </div>
               </div>
 
@@ -182,6 +195,7 @@
                   Email Address <span class="book-required">(Required)</span>
                 </label>
                 <input id="book-email" name="email" class="book-control" type="email" autocomplete="email" required />
+                <div class="book-form-message" id="book-email-error" role="alert" hidden></div>
               </div>
 
               <div class="book-field book-field--full">
@@ -192,8 +206,10 @@
                   <select class="book-phone-country" aria-label="Country code" name="phone_country_code" id="book-phone-country">
                     <option value="+91" selected>🇮🇳 India</option>
                   </select>
-                  <input id="book-phone" name="phone" class="book-control book-phone-input" inputmode="tel" autocomplete="tel" type="tel" required placeholder="e.g., 98xxxxxx" />
+                  <input id="book-phone" name="phone" class="book-control book-phone-input" inputmode="numeric" autocomplete="tel" type="tel" maxlength="10" pattern="[0-9]{10}" required placeholder="e.g., 98xxxxxx" aria-describedby="book-phone-hint" />
                 </div>
+                <div class="book-field-hint" id="book-phone-hint">10-digit mobile number</div>
+                <div class="book-form-message" id="book-phone-error" role="alert" hidden></div>
               </div>
 
               <h3 class="book-subtitle">Appointment Details</h3>
@@ -221,6 +237,7 @@
                   Doctor / Hospital Name <span class="book-required">(Required)</span>
                 </label>
                 <input id="book-doctor-hospital" name="doctorHospital" class="book-control" type="text" autocomplete="organization" required />
+                <div class="book-form-message" id="book-doctor-hospital-error" role="alert" hidden></div>
               </div>
 
               <div class="book-field book-field--full">
@@ -228,10 +245,12 @@
                   Helper Preference <span class="book-required">(Required)</span>
                 </label>
                 <select id="book-helper-preference" name="helperPreference" class="book-control" required>
-                  <option value="any" selected>No preference</option>
+                  <option value="" selected disabled>Select preference</option>
+                  <option value="any">No preference</option>
                   <option value="female">Female</option>
                   <option value="male">Male</option>
                 </select>
+                <div class="book-form-message" id="book-helper-preference-error" role="alert" hidden></div>
               </div>
 
               <div class="book-form-message" id="book-form-message" role="status" aria-live="polite" hidden></div>
