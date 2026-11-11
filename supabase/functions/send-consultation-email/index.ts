@@ -1,5 +1,10 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import {
+  escapeHtml,
+  formatAppointmentDateTime,
+  sendEmail,
+} from "../_shared/email.ts";
 
 type ConsultationRecord = {
   id: string;
@@ -27,68 +32,6 @@ type WebhookPayload = {
   old_record?: ConsultationRecord | null;
 };
 
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
-}
-
-function formatAppointmentDateTime(
-  appointmentDate?: string | null,
-  appointmentTime?: string | null,
-): string | null {
-  if (!appointmentDate || !appointmentTime) return null;
-
-  const dateMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(appointmentDate.trim());
-  const timeMatch = /^(\d{1,2}):(\d{2})(?::\d{2})?/.exec(appointmentTime.trim());
-  if (!dateMatch || !timeMatch) return null;
-
-  const year = Number(dateMatch[1]);
-  const month = Number(dateMatch[2]);
-  const day = Number(dateMatch[3]);
-  const hour24 = Number(timeMatch[1]);
-  const minute = Number(timeMatch[2]);
-
-  if (
-    !Number.isInteger(year) ||
-    !Number.isInteger(month) ||
-    !Number.isInteger(day) ||
-    !Number.isInteger(hour24) ||
-    !Number.isInteger(minute) ||
-    month < 1 ||
-    month > 12 ||
-    day < 1 ||
-    day > 31 ||
-    hour24 < 0 ||
-    hour24 > 23 ||
-    minute < 0 ||
-    minute > 59
-  ) {
-    return null;
-  }
-
-  const months = [
-    "Jan",
-    "Feb",
-    "Mar",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dec",
-  ];
-  const hour12 = hour24 % 12 || 12;
-  const ampm = hour24 < 12 ? "AM" : "PM";
-  return `${day} ${months[month - 1]} ${year}, ${hour12}:${String(minute).padStart(2, "0")} ${ampm}`;
-}
-
 Deno.serve(async (req: Request) => {
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
@@ -98,13 +41,9 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const resendApiKey = Deno.env.get("RESEND_API_KEY");
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
-    if (!resendApiKey) {
-      throw new Error("Missing RESEND_API_KEY secret");
-    }
     if (!supabaseUrl || !serviceRoleKey) {
       throw new Error("Missing Supabase environment configuration");
     }
@@ -114,8 +53,8 @@ Deno.serve(async (req: Request) => {
       "record" in payload && payload.record
         ? payload.record
         : "email" in payload && "id" in payload
-          ? (payload as ConsultationRecord)
-          : undefined;
+        ? (payload as ConsultationRecord)
+        : undefined;
 
     if (!record?.id || !record.email || !record.booking_person_name) {
       return new Response(
@@ -156,25 +95,19 @@ Deno.serve(async (req: Request) => {
       </div>
     `;
 
-    const emailResponse = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${resendApiKey}`,
-      },
-      body: JSON.stringify({
-        from: "ABI Parent Care <onboarding@resend.dev>",
-        to: [record.email],
-        subject: "We received your consultation request",
-        html,
-      }),
+    const emailResult = await sendEmail({
+      to: record.email,
+      toName: record.booking_person_name,
+      subject: "We received your consultation request",
+      html,
     });
 
-    const emailResult = await emailResponse.json();
-    if (!emailResponse.ok) {
-      console.error("Resend error:", emailResult);
+    if (!emailResult.ok) {
       return new Response(
-        JSON.stringify({ error: "Failed to send email", details: emailResult }),
+        JSON.stringify({
+          error: "Failed to send email",
+          details: emailResult.error,
+        }),
         { status: 502, headers: { "Content-Type": "application/json" } },
       );
     }
@@ -197,10 +130,10 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    return new Response(
-      JSON.stringify({ ok: true, email: emailResult }),
-      { status: 200, headers: { "Content-Type": "application/json" } },
-    );
+    return new Response(JSON.stringify({ ok: true, email: emailResult }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
   } catch (error) {
     console.error(error);
     const message = error instanceof Error ? error.message : "Unknown error";
