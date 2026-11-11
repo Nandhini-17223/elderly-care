@@ -114,11 +114,53 @@
                 </div>
               </div>
 
-              <div class="book-field book-field--full">
-                <label for="book-city">
-                  Current City <span class="book-required">(Required)</span>
-                </label>
-                <input id="book-city" name="city" class="book-control" type="text" autocomplete="address-level2" required />
+              <h3 class="book-subtitle">Patient Address</h3>
+
+              <div class="book-grid-2">
+                <div class="book-field">
+                  <label for="book-address-line1">
+                    House / Flat No. <span class="book-required">(Required)</span>
+                  </label>
+                  <input id="book-address-line1" name="addressLine1" class="book-control" type="text" autocomplete="address-line1" required />
+                </div>
+
+                <div class="book-field">
+                  <label for="book-street">
+                    Street / Road <span class="book-required">(Required)</span>
+                  </label>
+                  <input id="book-street" name="street" class="book-control" type="text" autocomplete="address-line2" required />
+                </div>
+              </div>
+
+              <div class="book-grid-2">
+                <div class="book-field">
+                  <label for="book-area">
+                    Area / Locality <span class="book-required">(Required)</span>
+                  </label>
+                  <input id="book-area" name="area" class="book-control" type="text" autocomplete="address-level3" required />
+                </div>
+
+                <div class="book-field">
+                  <label for="book-landmark">Landmark</label>
+                  <input id="book-landmark" name="landmark" class="book-control" type="text" autocomplete="off" />
+                </div>
+              </div>
+
+              <div class="book-grid-2">
+                <div class="book-field">
+                  <label for="book-city">
+                    Current City <span class="book-required">(Required)</span>
+                  </label>
+                  <input id="book-city" name="city" class="book-control" type="text" autocomplete="address-level2" required />
+                </div>
+
+                <div class="book-field">
+                  <label for="book-pincode">
+                    Pincode <span class="book-required">(Required)</span>
+                  </label>
+                  <input id="book-pincode" name="pincode" class="book-control" type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="postal-code" required />
+                  <div class="book-form-message" id="book-pincode-error" role="alert" hidden></div>
+                </div>
               </div>
 
               <h3 class="book-subtitle">Primary Contact Information</h3>
