@@ -9,6 +9,58 @@
     cant_make_it: true,
   };
 
+  const ON_SCREEN = {
+    accept_confirm: {
+      title: "Accept this visit?",
+      message:
+        "{{appointment_date_short}} · {{appointment_time}} · {{area}}. Tap Confirm to take this visit.",
+      button: "Confirm",
+    },
+    declined_confirm: {
+      title: "Decline this visit?",
+      message: "Tap Confirm to decline. We'll offer it to another helper.",
+      button: "Confirm",
+    },
+    accepted: {
+      title: "This visit is yours!",
+      message:
+        "We've emailed you the full details. Thank you, {{helper_first_name}}.",
+    },
+    already_taken: {
+      title: "Already taken",
+      message:
+        "Another helper accepted this visit first. Thank you for responding quickly.",
+    },
+    helper_engaged: {
+      title: "You're already booked",
+      message:
+        "You have another visit around this time, so we can't assign this one to you.",
+    },
+    declined: {
+      title: "Thanks for letting us know",
+      message: "We've offered this visit to another helper.",
+    },
+    confirmed: {
+      title: "See you there!",
+      message: "Thanks for confirming. The family is counting on you.",
+    },
+    cant_make_it_confirm: {
+      title: "Can't make this visit?",
+      message:
+        "Tell us why (optional), then tap Confirm. We'll arrange a replacement.",
+      button: "Confirm",
+    },
+    cant_make_it_done: {
+      title: "Thanks for telling us",
+      message: "Our care team will arrange a replacement.",
+    },
+    link_inactive: {
+      title: "This link is no longer active",
+      message:
+        "The visit may have been assigned, cancelled or already passed. Please contact your manager if you need help.",
+    },
+  };
+
   function qs(sel) {
     return document.querySelector(sel);
   }
@@ -41,51 +93,42 @@
     return "/functions/v1/assignment-action";
   }
 
-  function copyFor(action) {
+  function fallbackCopy(action) {
     switch (action) {
       case "accept":
-        return {
-          title: "Confirm acceptance",
-          detail:
-            "Click below to accept this appointment. Email scanners cannot confirm for you.",
-          button: "Confirm Accept",
-          success: "This appointment is yours!",
-        };
+        return ON_SCREEN.accept_confirm;
       case "decline":
-        return {
-          title: "Confirm decline",
-          detail:
-            "Click below to decline this appointment. Email scanners cannot confirm for you.",
-          button: "Confirm Decline",
-          success: "Thanks, noted.",
-        };
+        return ON_SCREEN.declined_confirm;
       case "confirm_attendance":
         return {
-          title: "Confirm you’ll be there",
-          detail:
-            "Click below to confirm attendance. Email scanners cannot confirm for you.",
-          button: "Confirm I’ll be there",
-          success: "Thanks, see you there!",
+          title: "Confirm you'll be there",
+          message: "Tap Confirm to let us know you'll attend.",
+          button: "Confirm",
         };
       case "cant_make_it":
-        return {
-          title: "Can’t make it?",
-          detail:
-            "Optionally share a reason, then confirm. Email scanners cannot submit for you.",
-          button: "Confirm I can’t make it",
-          success: "Thanks for letting us know. We’ll arrange a replacement.",
-        };
+        return ON_SCREEN.cant_make_it_confirm;
       default:
-        return {
-          title: "Invalid link",
-          detail: "This link is missing required details.",
-          button: "Confirm",
-          success: "Done.",
-        };
+        return ON_SCREEN.link_inactive;
     }
   }
 
-  document.addEventListener("DOMContentLoaded", function () {
+  async function apiCall(action, body) {
+    const response = await fetch(SUPABASE_URL + endpointFor(action), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: "Bearer " + SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify(body),
+    });
+    const payload = await response.json().catch(function () {
+      return {};
+    });
+    return { response: response, payload: payload };
+  }
+
+  document.addEventListener("DOMContentLoaded", async function () {
     const params = getParams();
     const confirmBtn = qs("#respond-confirm-btn");
     const messageEl = qs("#respond-message");
@@ -94,18 +137,48 @@
     const known =
       OFFER_ACTIONS[params.action] || ASSIGNMENT_ACTIONS[params.action];
     if (!params.token || !known) {
-      setStatus("Invalid link", "This link is missing required details.");
+      setStatus(ON_SCREEN.link_inactive.title, ON_SCREEN.link_inactive.message);
       if (confirmBtn) confirmBtn.hidden = true;
-      setMessage(
-        messageEl,
-        "Please open the action link from your email.",
-        "error"
-      );
+      setMessage(messageEl, ON_SCREEN.link_inactive.message, "error");
       return;
     }
 
-    const copy = copyFor(params.action);
-    setStatus(copy.title, copy.detail);
+    let copy = fallbackCopy(params.action);
+    setStatus(copy.title, copy.message);
+    if (confirmBtn) confirmBtn.textContent = copy.button || "Confirm";
+
+    // Load preview copy (includes appointment details / ref for accept)
+    try {
+      const preview = await apiCall(params.action, {
+        token: params.token,
+        action: params.action,
+        preview: true,
+      });
+      if (preview.payload && preview.payload.title) {
+        copy = {
+          title: preview.payload.title,
+          message: preview.payload.message || copy.message,
+          button: preview.payload.button || copy.button,
+        };
+        setStatus(copy.title, copy.message);
+        if (confirmBtn && copy.button) confirmBtn.textContent = copy.button;
+      }
+      if (preview.payload && preview.payload.ok === false) {
+        setStatus(
+          preview.payload.title || ON_SCREEN.link_inactive.title,
+          preview.payload.message || ON_SCREEN.link_inactive.message
+        );
+        if (confirmBtn) confirmBtn.hidden = true;
+        setMessage(
+          messageEl,
+          preview.payload.message || ON_SCREEN.link_inactive.message,
+          "error"
+        );
+        return;
+      }
+    } catch (_err) {
+      // keep fallback copy
+    }
 
     if (params.action === "cant_make_it" && actionsEl) {
       const reasonWrap = document.createElement("div");
@@ -118,7 +191,6 @@
     }
 
     if (confirmBtn) {
-      confirmBtn.textContent = copy.button;
       confirmBtn.addEventListener("click", async function () {
         confirmBtn.disabled = true;
         confirmBtn.setAttribute("aria-busy", "true");
@@ -134,27 +206,20 @@
         }
 
         try {
-          const response = await fetch(SUPABASE_URL + endpointFor(params.action), {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              apikey: SUPABASE_ANON_KEY,
-              Authorization: "Bearer " + SUPABASE_ANON_KEY,
-            },
-            body: JSON.stringify(body),
-          });
-
-          const payload = await response.json().catch(function () {
-            return {};
-          });
-
+          const result = await apiCall(params.action, body);
+          const payload = result.payload || {};
+          const ok = Boolean(payload.ok);
+          const title =
+            payload.title ||
+            (ok ? "Response recorded" : ON_SCREEN.link_inactive.title);
           const message =
-            (payload && payload.message) ||
-            (response.ok ? copy.success : "Something went wrong. Please try again.");
+            payload.message ||
+            (ok
+              ? "Done."
+              : ON_SCREEN.link_inactive.message);
 
-          const ok = Boolean(payload && payload.ok);
           setMessage(messageEl, message, ok ? "success" : "error");
-          setStatus(ok ? "Response recorded" : "Unable to complete", message);
+          setStatus(title, message);
           if (actionsEl) actionsEl.hidden = true;
           const reasonEl = qs("#respond-reason");
           if (reasonEl && reasonEl.closest(".book-field")) {

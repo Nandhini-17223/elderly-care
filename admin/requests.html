@@ -42,11 +42,11 @@
       <div class="container">
         <div class="admin-card">
           <h1>All requests</h1>
-          <p class="book-field-hint">Search by name, phone, or pincode. Filter by status and date.</p>
+          <p class="book-field-hint">Search by ref, name, phone, or pincode. Filter by status and date.</p>
           <div class="book-form-message" id="req-message" role="status" aria-live="polite" hidden></div>
           <form class="admin-filters" id="req-filters">
             <label>Search
-              <input id="filter-q" type="search" placeholder="Name, phone, pincode" />
+              <input id="filter-q" type="search" placeholder="Ref, name, phone, pincode" />
             </label>
             <label>Status
               <select id="filter-status">
@@ -72,6 +72,7 @@
             <table class="admin-table">
               <thead>
                 <tr>
+                  <th>Ref</th>
                   <th>Patient</th>
                   <th>Phone</th>
                   <th>When</th>
@@ -81,7 +82,7 @@
                 </tr>
               </thead>
               <tbody id="req-rows">
-                <tr><td colspan="6" class="admin-empty">Loading…</td></tr>
+                <tr><td colspan="7" class="admin-empty">Loading…</td></tr>
               </tbody>
             </table>
           </div>

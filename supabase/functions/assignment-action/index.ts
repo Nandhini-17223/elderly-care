@@ -1,24 +1,26 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import {
-  appointmentLabels,
-  formatRemaining,
-  guardianReplacementArrangingHtml,
+  guardianReplacementArrangingEmail,
   sha256Hex,
 } from "../_shared/assignment.ts";
-import { escapeHtml, sendEmail } from "../_shared/email.ts";
+import { sendEmail } from "../_shared/email.ts";
 import { resolveSecret } from "../_shared/secrets.ts";
 import {
-  assignButtonHtml,
+  MANAGER_FIRST_NAME,
   firstName,
-  formatRequestSummaryHtml,
   seniorAssignUrl,
 } from "../_shared/senior.ts";
+import {
+  ON_SCREEN,
+  templateM5,
+} from "../_shared/templates.ts";
 
 type ActionPayload = {
   token?: string;
   action?: string;
   reason?: string;
+  preview?: boolean;
 };
 
 const corsHeaders = {
@@ -49,7 +51,7 @@ async function notifyDropoutEmails(
     supabase
       .from("consultation_requests")
       .select(
-        "id, parent_name, parent_age, area, pincode, appointment_date, appointment_time, doctor_hospital, helper_preference, needs_senior_reason, booking_person_name, email, address_line1, street, landmark, city",
+        "id, ref_number, parent_name, parent_age, area, pincode, appointment_date, appointment_time, doctor_hospital, helper_preference, needs_senior_reason, booking_person_name, relationship, phone_country_code, phone, email, address_line1, street, landmark, city",
       )
       .eq("id", requestId)
       .maybeSingle(),
@@ -63,58 +65,40 @@ async function notifyDropoutEmails(
   if (!request || !helper) return { senior: false, guardian: false };
 
   const seniorEmail = await resolveSecret(supabase, "SENIOR_EMAIL");
-  const { dateLabel, timeLabel } = appointmentLabels(request);
-  const patientFirst = firstName(request.parent_name);
+  const guardianPhone =
+    `${request.phone_country_code ?? ""} ${request.phone ?? ""}`.trim();
 
   let seniorOk = false;
   if (seniorEmail) {
-    const apptMs = Date.parse(
-      // Approximate IST wall clock as UTC+5:30 for remaining time display
-      `${request.appointment_date}T${
-        String(request.appointment_time).slice(0, 8)
-      }+05:30`,
-    );
-    const remaining = Number.isFinite(apptMs)
-      ? formatRemaining(apptMs - Date.now())
-      : "soon";
-    const assignUrl = seniorAssignUrl(requestId);
-    const html = `
-      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937;">
-        <p><strong>URGENT:</strong> ${escapeHtml(helper.full_name)} can’t attend – ${escapeHtml(patientFirst)}, ${escapeHtml(dateLabel)} ${escapeHtml(timeLabel)}</p>
-        ${
-      dropoutReason
-        ? `<p><strong>Reason:</strong> ${escapeHtml(dropoutReason)}</p>`
-        : ""
-    }
-        <p><strong>Time remaining:</strong> ${escapeHtml(remaining)}</p>
-        ${
-      formatRequestSummaryHtml({
-        parentName: request.parent_name,
-        parentAge: request.parent_age,
-        appointmentDate: request.appointment_date,
-        appointmentTime: request.appointment_time,
-        area: request.area,
-        pincode: request.pincode,
-        doctorHospital: request.doctor_hospital,
-        helperPreference: request.helper_preference,
-        reason: request.needs_senior_reason,
-      })
-    }
-        <p style="margin: 24px 0;">${assignButtonHtml(assignUrl)}</p>
-        <p>Warm regards,<br />ABI Parent Care</p>
-      </div>
-    `;
+    const email = templateM5({
+      ref: String(request.ref_number ?? "–"),
+      manager_first_name: MANAGER_FIRST_NAME,
+      helper_full_name: helper.full_name,
+      parent_name: request.parent_name,
+      parent_age: request.parent_age,
+      appointment_date: request.appointment_date,
+      appointment_time: request.appointment_time,
+      area: request.area,
+      city: request.city,
+      pincode: request.pincode,
+      doctor_hospital: request.doctor_hospital,
+      booking_person_name: request.booking_person_name,
+      relationship: String(request.relationship ?? ""),
+      guardian_phone: guardianPhone,
+      dropout_reason: dropoutReason,
+      assign_url: seniorAssignUrl(requestId),
+    });
     const result = await sendEmail({
       to: seniorEmail,
       toName: "Senior coordinator",
-      subject:
-        `URGENT: ${helper.full_name} can’t attend – ${patientFirst}, ${dateLabel} ${timeLabel}`,
-      html,
+      subject: email.subject,
+      html: email.html,
+      text: email.text,
     });
     seniorOk = result.ok;
   }
 
-  const guardianHtml = guardianReplacementArrangingHtml(
+  const guardianEmail = guardianReplacementArrangingEmail(
     {
       parent_name: request.parent_name,
       parent_age: request.parent_age,
@@ -128,10 +112,11 @@ async function notifyDropoutEmails(
       appointment_time: request.appointment_time,
       doctor_hospital: request.doctor_hospital,
       booking_person_name: request.booking_person_name,
-      relationship: "",
-      phone_country_code: "",
-      phone: "",
+      relationship: String(request.relationship ?? ""),
+      phone_country_code: String(request.phone_country_code ?? ""),
+      phone: String(request.phone ?? ""),
       email: request.email,
+      ref_number: request.ref_number,
     },
     helper.full_name,
   );
@@ -139,11 +124,65 @@ async function notifyDropoutEmails(
   const guardianResult = await sendEmail({
     to: request.email,
     toName: request.booking_person_name,
-    subject: `${firstName(helper.full_name)} is unable to attend – arranging replacement`,
-    html: guardianHtml,
+    subject: guardianEmail.subject,
+    html: guardianEmail.html,
+    text: guardianEmail.text,
   });
 
   return { senior: seniorOk, guardian: guardianResult.ok };
+}
+
+async function previewAssignment(
+  supabase: ReturnType<typeof createClient>,
+  tokenHash: string,
+  action: string,
+) {
+  const { data: tokenRow } = await supabase
+    .from("assignment_tokens")
+    .select(
+      "id, invalidated_at, helpers(full_name), consultation_requests(ref_number, status, appointment_date, appointment_time, area)",
+    )
+    .eq("token_hash", tokenHash)
+    .maybeSingle();
+
+  if (!tokenRow || tokenRow.invalidated_at) {
+    return {
+      ok: false,
+      code: "invalid_token",
+      title: ON_SCREEN.link_inactive.title,
+      message: ON_SCREEN.link_inactive.message,
+    };
+  }
+
+  if (action === "cant_make_it") {
+    return {
+      ok: true,
+      code: "preview",
+      title: ON_SCREEN.cant_make_it_confirm.title,
+      message: ON_SCREEN.cant_make_it_confirm.message,
+      button: ON_SCREEN.cant_make_it_confirm.button,
+      helper_first_name: firstName(
+        (tokenRow as { helpers?: { full_name?: string } | null }).helpers
+          ?.full_name,
+      ),
+      ref_number:
+        (tokenRow as {
+          consultation_requests?: { ref_number?: string } | null;
+        }).consultation_requests?.ref_number,
+    };
+  }
+
+  return {
+    ok: true,
+    code: "preview",
+    title: "Confirm you'll be there",
+    message: "Tap Confirm to let us know you'll attend.",
+    button: "Confirm",
+    helper_first_name: firstName(
+      (tokenRow as { helpers?: { full_name?: string } | null }).helpers
+        ?.full_name,
+    ),
+  };
 }
 
 Deno.serve(async (req: Request) => {
@@ -179,6 +218,10 @@ Deno.serve(async (req: Request) => {
     const tokenHash = await sha256Hex(token);
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
+    if (payload.preview) {
+      return jsonResponse(await previewAssignment(supabase, tokenHash, action));
+    }
+
     if (action === "confirm_attendance") {
       const { data, error } = await supabase.rpc("confirm_helper_attendance", {
         p_token_hash: tokenHash,
@@ -186,7 +229,11 @@ Deno.serve(async (req: Request) => {
       if (error) {
         console.error("confirm_helper_attendance", error);
         return jsonResponse(
-          { ok: false, message: "Could not confirm attendance." },
+          {
+            ok: false,
+            title: ON_SCREEN.link_inactive.title,
+            message: "Could not confirm attendance.",
+          },
           500,
         );
       }
@@ -195,10 +242,19 @@ Deno.serve(async (req: Request) => {
         code?: string;
         message?: string;
       };
+      if (!result?.ok) {
+        return jsonResponse({
+          ok: false,
+          code: result?.code,
+          title: ON_SCREEN.link_inactive.title,
+          message: ON_SCREEN.link_inactive.message,
+        });
+      }
       return jsonResponse({
-        ok: Boolean(result?.ok),
+        ok: true,
         code: result?.code,
-        message: result?.message ?? "Unable to confirm.",
+        title: ON_SCREEN.confirmed.title,
+        message: ON_SCREEN.confirmed.message,
       });
     }
 
@@ -209,7 +265,11 @@ Deno.serve(async (req: Request) => {
     if (error) {
       console.error("helper_cant_make_it", error);
       return jsonResponse(
-        { ok: false, message: "Could not process this response." },
+        {
+          ok: false,
+          title: ON_SCREEN.link_inactive.title,
+          message: "Could not process this response.",
+        },
         500,
       );
     }
@@ -232,11 +292,20 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    if (!result?.ok) {
+      return jsonResponse({
+        ok: false,
+        code: result?.code,
+        title: ON_SCREEN.link_inactive.title,
+        message: ON_SCREEN.link_inactive.message,
+      });
+    }
+
     return jsonResponse({
-      ok: Boolean(result?.ok),
+      ok: true,
       code: result?.code,
-      message: result?.message ??
-        "Thanks for letting us know. We’ll arrange a replacement.",
+      title: ON_SCREEN.cant_make_it_done.title,
+      message: ON_SCREEN.cant_make_it_done.message,
     });
   } catch (error) {
     console.error(error);

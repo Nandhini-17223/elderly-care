@@ -1,21 +1,23 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient, type SupabaseClient } from "jsr:@supabase/supabase-js@2";
 import {
-  appointmentLabels,
   createRawToken,
-  reminderEmailHtml,
+  reminderEmail,
   type RequestContact,
 } from "../_shared/assignment.ts";
-import { escapeHtml, sendEmail } from "../_shared/email.ts";
+import { sendEmail } from "../_shared/email.ts";
 import { resolveSecret } from "../_shared/secrets.ts";
 import {
-  assignButtonHtml,
+  MANAGER_FIRST_NAME,
   firstName,
+  reminderStatusLabel,
   seniorAssignUrl,
 } from "../_shared/senior.ts";
+import { templateM6, templateM7 } from "../_shared/templates.ts";
 
 type AssignedRow = {
   id: string;
+  ref_number?: string | null;
   status: string;
   parent_name: string;
   parent_age: number;
@@ -60,6 +62,7 @@ function jsonResponse(body: unknown, status = 200): Response {
 
 function asContact(row: AssignedRow): RequestContact {
   return {
+    ref_number: row.ref_number,
     parent_name: row.parent_name,
     parent_age: row.parent_age,
     address_line1: row.address_line1,
@@ -184,8 +187,7 @@ async function processReminders(
           helper.id,
         );
         if (token) {
-          const { dateLabel, timeLabel } = appointmentLabels(row);
-          const html = reminderEmailHtml(
+          const email = reminderEmail(
             asContact(row),
             helper.full_name,
             token,
@@ -194,8 +196,9 @@ async function processReminders(
           const sent = await sendEmail({
             to: helper.email,
             toName: helper.full_name,
-            subject: `Reminder: appointment in 12 hours – ${dateLabel}, ${timeLabel}`,
-            html,
+            subject: email.subject,
+            html: email.html,
+            text: email.text,
           });
           entry.reminder_12h = { sent: sent.ok };
         } else {
@@ -220,8 +223,7 @@ async function processReminders(
           helper.id,
         );
         if (token) {
-          const { dateLabel, timeLabel } = appointmentLabels(row);
-          const html = reminderEmailHtml(
+          const email = reminderEmail(
             asContact(row),
             helper.full_name,
             token,
@@ -230,8 +232,9 @@ async function processReminders(
           const sent = await sendEmail({
             to: helper.email,
             toName: helper.full_name,
-            subject: `Reminder: appointment in 6 hours – ${dateLabel}, ${timeLabel}`,
-            html,
+            subject: email.subject,
+            html: email.html,
+            text: email.text,
           });
           entry.reminder_6h = { sent: sent.ok };
         } else {
@@ -268,9 +271,26 @@ async function processNoConfirmAlerts(
     const appt = appointmentMs(row);
     if (!Number.isFinite(appt)) continue;
     const hoursLeft = (appt - Date.now()) / 3600000;
-    const { dateLabel, timeLabel } = appointmentLabels(row);
-    const patientFirst = firstName(row.parent_name);
     const assignUrl = seniorAssignUrl(row.id);
+    const m6base = {
+      ref: String(row.ref_number ?? "–"),
+      manager_first_name: MANAGER_FIRST_NAME,
+      helper_full_name: helper.full_name,
+      helper_first_name: firstName(helper.full_name),
+      helper_phone: helper.phone,
+      parent_name: row.parent_name,
+      parent_age: row.parent_age,
+      appointment_date: row.appointment_date,
+      appointment_time: row.appointment_time,
+      area: row.area,
+      city: row.city,
+      pincode: row.pincode,
+      doctor_hospital: row.doctor_hospital,
+      assigned_at: row.assigned_at,
+      r12_status: reminderStatusLabel(row.reminder_12h_sent_at),
+      r6_status: reminderStatusLabel(row.reminder_6h_sent_at),
+      open_url: assignUrl,
+    };
     const entry: Record<string, unknown> = {
       request_id: row.id,
       hours_left: Math.round(hoursLeft * 100) / 100,
@@ -283,19 +303,13 @@ async function processNoConfirmAlerts(
         "no_confirm_alert_sent_at",
       );
       if (claimed) {
-        const html = `
-          <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937;">
-            <p>Helper <strong>${escapeHtml(helper.full_name)}</strong> hasn’t confirmed – ${escapeHtml(patientFirst)}, ${escapeHtml(dateLabel)} ${escapeHtml(timeLabel)}. Please call: ${escapeHtml(helper.phone)}</p>
-            <p style="margin: 24px 0;">${assignButtonHtml(assignUrl, "Open request")}</p>
-            <p>Warm regards,<br />ABI Parent Care</p>
-          </div>
-        `;
+        const email = templateM6(m6base);
         const sent = await sendEmail({
           to: seniorEmail,
           toName: "Senior coordinator",
-          subject:
-            `Helper ${helper.full_name} hasn’t confirmed – ${patientFirst}, ${dateLabel} ${timeLabel}`,
-          html,
+          subject: email.subject,
+          html: email.html,
+          text: email.text,
         });
         entry.alert_3h = { sent: sent.ok };
       }
@@ -323,19 +337,13 @@ async function processNoConfirmAlerts(
           "no_confirm_second_alert_sent_at",
         );
         if (claimed) {
-          const html = `
-            <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937;">
-              <p><strong>URGENT:</strong> Helper <strong>${escapeHtml(helper.full_name)}</strong> still hasn’t confirmed – ${escapeHtml(patientFirst)}, ${escapeHtml(dateLabel)} ${escapeHtml(timeLabel)}. Please call: ${escapeHtml(helper.phone)}</p>
-              <p style="margin: 24px 0;">${assignButtonHtml(assignUrl, "Open request")}</p>
-              <p>Warm regards,<br />ABI Parent Care</p>
-            </div>
-          `;
+          const email = templateM7(m6base);
           const sent = await sendEmail({
             to: seniorEmail,
             toName: "Senior coordinator",
-            subject:
-              `URGENT: Helper ${helper.full_name} still hasn’t confirmed – ${patientFirst}, ${dateLabel} ${timeLabel}`,
-            html,
+            subject: email.subject,
+            html: email.html,
+            text: email.text,
           });
           entry.alert_1h = { sent: sent.ok };
         }
@@ -372,7 +380,7 @@ Deno.serve(async (req: Request) => {
     let query = supabase
       .from("consultation_requests")
       .select(
-        "id, status, parent_name, parent_age, address_line1, street, area, landmark, city, pincode, appointment_date, appointment_time, doctor_hospital, booking_person_name, relationship, phone_country_code, phone, assigned_helper_id, assigned_at, helper_confirmed_at, reminder_12h_sent_at, reminder_6h_sent_at, no_confirm_alert_sent_at, no_confirm_second_alert_sent_at",
+        "id, ref_number, status, parent_name, parent_age, address_line1, street, area, landmark, city, pincode, appointment_date, appointment_time, doctor_hospital, booking_person_name, relationship, phone_country_code, phone, assigned_helper_id, assigned_at, helper_confirmed_at, reminder_12h_sent_at, reminder_6h_sent_at, no_confirm_alert_sent_at, no_confirm_second_alert_sent_at",
       )
       .eq("status", "assigned")
       .not("assigned_helper_id", "is", null);

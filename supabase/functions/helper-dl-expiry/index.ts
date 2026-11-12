@@ -75,7 +75,7 @@ async function notifyUnavailable(
     supabase
       .from("consultation_requests")
       .select(
-        "id, parent_name, parent_age, area, pincode, appointment_date, appointment_time, doctor_hospital, helper_preference, needs_senior_reason, booking_person_name, email, address_line1, street, landmark, city",
+        "id, ref_number, parent_name, parent_age, area, pincode, appointment_date, appointment_time, doctor_hospital, helper_preference, needs_senior_reason, booking_person_name, relationship, phone_country_code, phone, email, address_line1, street, landmark, city",
       )
       .eq("id", requestId)
       .maybeSingle(),
@@ -83,73 +83,63 @@ async function notifyUnavailable(
   ]);
   if (!request) return;
 
-  const { dateLabel, timeLabel } = appointmentLabels(request);
-  const patientFirst = firstName(request.parent_name);
-
   if (seniorEmail) {
-    const apptMs = Date.parse(
-      `${request.appointment_date}T${
-        String(request.appointment_time).slice(0, 8)
-      }+05:30`,
-    );
-    const remaining = Number.isFinite(apptMs)
-      ? formatRemaining(apptMs - Date.now())
-      : "soon";
+    const email = templateM5({
+      ref: String(request.ref_number ?? "–"),
+      manager_first_name: MANAGER_FIRST_NAME,
+      helper_full_name: helper.full_name,
+      parent_name: request.parent_name,
+      parent_age: request.parent_age,
+      appointment_date: request.appointment_date,
+      appointment_time: request.appointment_time,
+      area: request.area,
+      city: request.city,
+      pincode: request.pincode,
+      doctor_hospital: request.doctor_hospital,
+      booking_person_name: request.booking_person_name,
+      relationship: String(request.relationship ?? ""),
+      guardian_phone: `${request.phone_country_code ?? ""} ${request.phone ?? ""}`.trim(),
+      dropout_reason: reasonLabel,
+      assign_url: seniorAssignUrl(requestId),
+    });
     await sendEmail({
       to: seniorEmail,
       toName: "Senior coordinator",
-      subject:
-        `URGENT: ${helper.full_name} unavailable – ${patientFirst}, ${dateLabel} ${timeLabel}`,
-      html: `
-        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937;">
-          <p><strong>URGENT:</strong> ${escapeHtml(helper.full_name)} unavailable – ${escapeHtml(patientFirst)}, ${escapeHtml(dateLabel)} ${escapeHtml(timeLabel)}</p>
-          <p><strong>Reason:</strong> ${escapeHtml(reasonLabel)}</p>
-          <p><strong>Time remaining:</strong> ${escapeHtml(remaining)}</p>
-          ${
-        formatRequestSummaryHtml({
-          parentName: request.parent_name,
-          parentAge: request.parent_age,
-          appointmentDate: request.appointment_date,
-          appointmentTime: request.appointment_time,
-          area: request.area,
-          pincode: request.pincode,
-          doctorHospital: request.doctor_hospital,
-          helperPreference: request.helper_preference,
-          reason: "helper_unavailable",
-        })
-      }
-          <p style="margin: 24px 0;">${assignButtonHtml(seniorAssignUrl(requestId))}</p>
-          <p>Warm regards,<br />ABI Parent Care</p>
-        </div>
-      `,
+      subject: email.subject,
+      html: email.html,
+      text: email.text,
     });
   }
 
   if (request.email) {
+    const guardianEmail = guardianReplacementArrangingEmail(
+      {
+        parent_name: request.parent_name,
+        parent_age: request.parent_age,
+        address_line1: request.address_line1,
+        street: request.street,
+        area: request.area,
+        landmark: request.landmark,
+        city: request.city,
+        pincode: request.pincode,
+        appointment_date: request.appointment_date,
+        appointment_time: request.appointment_time,
+        doctor_hospital: request.doctor_hospital,
+        booking_person_name: request.booking_person_name,
+        relationship: String(request.relationship ?? ""),
+        phone_country_code: String(request.phone_country_code ?? ""),
+        phone: String(request.phone ?? ""),
+        email: request.email,
+        ref_number: request.ref_number,
+      },
+      helper.full_name,
+    );
     await sendEmail({
       to: request.email,
       toName: request.booking_person_name,
-      subject: `${firstName(helper.full_name)} is unable to attend – arranging replacement`,
-      html: guardianReplacementArrangingHtml(
-        {
-          parent_name: request.parent_name,
-          parent_age: request.parent_age,
-          address_line1: request.address_line1,
-          street: request.street,
-          area: request.area,
-          landmark: request.landmark,
-          city: request.city,
-          pincode: request.pincode,
-          appointment_date: request.appointment_date,
-          appointment_time: request.appointment_time,
-          doctor_hospital: request.doctor_hospital,
-          booking_person_name: request.booking_person_name,
-          relationship: "",
-          phone_country_code: "",
-          phone: "",
-        },
-        helper.full_name,
-      ),
+      subject: guardianEmail.subject,
+      html: guardianEmail.html,
+      text: guardianEmail.text,
     });
   }
 }
@@ -208,33 +198,42 @@ async function emailDlWarning(
   }
 
   const expiry = helper.dl_expiry ?? "unknown";
-  let subject: string;
-  let lead: string;
+  let expiry_phrase: string;
+  let expired = false;
   if (kind === "expired") {
-    subject = `Helper DL expired – ${helper.full_name}`;
-    lead =
-      `Driving licence for <strong>${escapeHtml(helper.full_name)}</strong> expired on ${escapeHtml(expiry)}. Verification status set to expired.`;
+    expiry_phrase = "has expired";
+    expired = true;
+  } else if (kind === "7") {
+    expiry_phrase = "expires in 7 days";
   } else {
-    subject = `Helper DL expires in ${kind} days – ${helper.full_name}`;
-    lead =
-      `Driving licence for <strong>${escapeHtml(helper.full_name)}</strong> expires on ${escapeHtml(expiry)} (${kind} days).`;
+    expiry_phrase = "expires in 30 days";
   }
+
+  let upcoming_count = 0;
+  if (expired) {
+    const { data: jobs } = await supabase.rpc(
+      "list_helper_upcoming_assigned_jobs",
+      { p_helper_id: helper.id },
+    );
+    upcoming_count = Array.isArray(jobs) ? jobs.length : 0;
+  }
+
+  const email = templateM8({
+    manager_first_name: MANAGER_FIRST_NAME,
+    helper_full_name: helper.full_name,
+    expiry_phrase,
+    dl_expiry: String(expiry),
+    upcoming_count,
+    open_url: helperProfileUrl(helper.id),
+    expired,
+  });
 
   const result = await sendEmail({
     to: seniorEmail,
     toName: "Manager",
-    subject,
-    html: `
-      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937;">
-        <p>${lead}</p>
-        <p>
-          <strong>Helper:</strong> ${escapeHtml(helper.full_name)}<br />
-          <strong>Email:</strong> ${escapeHtml(helper.email)}<br />
-          <strong>Phone:</strong> ${escapeHtml(helper.phone)}
-        </p>
-        <p>Warm regards,<br />ABI Parent Care</p>
-      </div>
-    `,
+    subject: email.subject,
+    html: email.html,
+    text: email.text,
   });
   return result.ok;
 }
