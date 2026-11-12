@@ -23,7 +23,7 @@
     let query = sb
       .from("consultation_requests")
       .select(
-        "id, parent_name, phone, phone_country_code, pincode, appointment_date, appointment_time, status, created_at"
+        "id, ref_number, parent_name, phone, phone_country_code, pincode, appointment_date, appointment_time, status, created_at"
       )
       .order("appointment_date", { ascending: false })
       .order("appointment_time", { ascending: false })
@@ -41,6 +41,7 @@
       const needle = q.toLowerCase();
       rows = rows.filter(function (row) {
         const hay = [
+          row.ref_number,
           row.parent_name,
           row.phone,
           row.phone_country_code,
@@ -56,7 +57,7 @@
     const tbody = document.querySelector("#req-rows");
     if (!rows.length) {
       tbody.innerHTML =
-        '<tr><td colspan="6" class="admin-empty">No matching requests.</td></tr>';
+        '<tr><td colspan="7" class="admin-empty">No matching requests.</td></tr>';
       return;
     }
 
@@ -65,8 +66,11 @@
         return (
           "<tr>" +
           "<td><strong>" +
-          esc(row.parent_name) +
+          esc(row.ref_number || "—") +
           "</strong></td>" +
+          "<td>" +
+          esc(row.parent_name) +
+          "</td>" +
           "<td>" +
           esc((row.phone_country_code || "") + " " + (row.phone || "")) +
           "</td>" +

@@ -1,21 +1,16 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient, type SupabaseClient } from "jsr:@supabase/supabase-js@2";
-import {
-  escapeHtml,
-  formatAppointmentDate,
-  formatAppointmentTime,
-  sendEmail,
-} from "../_shared/email.ts";
+import { sendEmail } from "../_shared/email.ts";
 import { resolveSecret } from "../_shared/secrets.ts";
 import {
-  assignButtonHtml,
-  formatRequestSummaryHtml,
+  MANAGER_FIRST_NAME,
+  RESPOND_BASE,
+  firstName,
   seniorAssignUrl,
 } from "../_shared/senior.ts";
 import { loadAppSettings, settingInt } from "../_shared/staff-auth.ts";
-
-const RESPOND_BASE =
-  "https://nandhini-17223.github.io/elderly-care/respond.html";
+import { templateH1 } from "../_shared/templates-h.ts";
+import { templateM4 } from "../_shared/templates-m.ts";
 
 type DispatcherPayload = {
   request_id?: string;
@@ -28,6 +23,7 @@ type DispatcherPayload = {
 
 type RequestRow = {
   id: string;
+  ref_number?: string | null;
   status: string;
   parent_name: string;
   parent_age: number;
@@ -91,63 +87,37 @@ async function createOfferToken(): Promise<{ token: string; hash: string }> {
   return { token, hash };
 }
 
-function approxDistanceLabel(km: number | null | undefined): string {
-  if (km == null || Number.isNaN(Number(km))) return "Nearby";
-  const rounded = Math.round(Number(km) * 10) / 10;
-  return `~${rounded} km`;
-}
-
-function preferenceLabel(value: string | null | undefined): string {
-  if (value === "female") return "Female helper";
-  if (value === "male") return "Male helper";
-  return "No preference";
-}
-
 async function sendOfferEmail(
   request: RequestRow,
   helper: SuitableHelper,
   token: string,
   distanceKm: number | null,
 ): Promise<boolean> {
-  const dateLabel = formatAppointmentDate(request.appointment_date) ??
-    request.appointment_date;
-  const timeLabel = formatAppointmentTime(request.appointment_time) ??
-    request.appointment_time;
-  const area = [request.area, request.pincode].filter(Boolean).join(" · ") ||
-    "Area on file";
-  const subject = `New appointment near you – ${dateLabel}, ${timeLabel}`;
   const acceptUrl =
     `${RESPOND_BASE}?token=${encodeURIComponent(token)}&action=accept`;
   const declineUrl =
     `${RESPOND_BASE}?token=${encodeURIComponent(token)}&action=decline`;
 
-  const html = `
-    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937;">
-      <p>Hi ${escapeHtml(helper.full_name)},</p>
-      <p>A new appointment is available near you.</p>
-      <p>
-        <strong>Date:</strong> ${escapeHtml(dateLabel)}<br />
-        <strong>Time:</strong> ${escapeHtml(timeLabel)}<br />
-        <strong>Area:</strong> ${escapeHtml(area)}<br />
-        <strong>Approx. distance:</strong> ${escapeHtml(approxDistanceLabel(distanceKm))}<br />
-        <strong>Doctor / Hospital:</strong> ${escapeHtml(request.doctor_hospital)}<br />
-        <strong>Patient age:</strong> ${escapeHtml(String(request.parent_age))}<br />
-        <strong>Helper preference:</strong> ${escapeHtml(preferenceLabel(request.helper_preference))}
-      </p>
-      <p><em>Full address and family contact will be shared after you accept.</em></p>
-      <p style="margin: 24px 0;">
-        <a href="${acceptUrl}" style="background:#1d6fd8;color:#fff;padding:12px 18px;border-radius:8px;text-decoration:none;display:inline-block;margin-right:8px;">Accept</a>
-        <a href="${declineUrl}" style="background:#e5e7eb;color:#111827;padding:12px 18px;border-radius:8px;text-decoration:none;display:inline-block;">Decline</a>
-      </p>
-      <p>Warm regards,<br />ABI Parent Care</p>
-    </div>
-  `;
+  const email = templateH1({
+    ref: String(request.ref_number ?? "–"),
+    helper_first_name: firstName(helper.full_name),
+    appointment_date: request.appointment_date,
+    appointment_time: request.appointment_time,
+    area: request.area,
+    pincode: request.pincode,
+    distance_km: distanceKm,
+    doctor_hospital: request.doctor_hospital,
+    parent_age: request.parent_age,
+    accept_url: acceptUrl,
+    decline_url: declineUrl,
+  });
 
   const result = await sendEmail({
     to: helper.email,
     toName: helper.full_name,
-    subject,
-    html,
+    subject: email.subject,
+    html: email.html,
+    text: email.text,
   });
   return result.ok;
 }
@@ -171,6 +141,7 @@ async function notifySeniorOfExpiry(
   requestId: string,
   helperName: string,
   expiryMinutes = 60,
+  helperPhone: string | null = null,
 ) {
   const seniorEmail = await resolveSecret(supabase, "SENIOR_EMAIL");
   if (!seniorEmail) {
@@ -181,38 +152,28 @@ async function notifySeniorOfExpiry(
   const request = await loadRequest(supabase, requestId);
   if (!request) return;
 
-  const { data: full } = await supabase
-    .from("consultation_requests")
-    .select("needs_senior_reason, doctor_hospital, helper_preference")
-    .eq("id", requestId)
-    .maybeSingle();
-
   const assignUrl = seniorAssignUrl(requestId);
   const windowLabel = expiryMinutes === 15 ? "15 minutes" : "1 hour";
-  const html = `
-    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937;">
-      <p>No response from <strong>${escapeHtml(helperName)}</strong> within ${escapeHtml(windowLabel)} – please assign another helper.</p>
-      ${formatRequestSummaryHtml({
-        parentName: request.parent_name,
-        parentAge: request.parent_age,
-        appointmentDate: request.appointment_date,
-        appointmentTime: request.appointment_time,
-        area: request.area,
-        pincode: request.pincode,
-        doctorHospital: full?.doctor_hospital ?? request.doctor_hospital,
-        helperPreference: full?.helper_preference ?? request.helper_preference,
-        reason: full?.needs_senior_reason ?? null,
-      })}
-      <p style="margin: 24px 0;">${assignButtonHtml(assignUrl)}</p>
-      <p>Warm regards,<br />ABI Parent Care</p>
-    </div>
-  `;
+
+  const email = templateM4({
+    ref: String(request.ref_number ?? "–"),
+    manager_first_name: MANAGER_FIRST_NAME,
+    helper_full_name: helperName,
+    helper_phone: helperPhone,
+    parent_name: request.parent_name,
+    appointment_date: request.appointment_date,
+    appointment_time: request.appointment_time,
+    area: request.area,
+    expiry_window: windowLabel,
+    assign_url: assignUrl,
+  });
 
   await sendEmail({
     to: seniorEmail,
     toName: "Senior coordinator",
-    subject: `${helperName} did not respond – please assign another`,
-    html,
+    subject: email.subject,
+    html: email.html,
+    text: email.text,
   });
 }
 
@@ -228,7 +189,7 @@ async function expireStaleSeniorOffers(
   const { data, error } = await supabase
     .from("helper_offers")
     .select(
-      "id, request_id, helper_id, sent_at, helpers(full_name), consultation_requests(appointment_date, appointment_time)",
+      "id, request_id, helper_id, sent_at, helpers(full_name, phone), consultation_requests(appointment_date, appointment_time)",
     )
     .eq("source", "senior")
     .eq("status", "sent");
@@ -279,15 +240,17 @@ async function expireStaleSeniorOffers(
       helper_name?: string;
     };
     if (payload?.ok && payload.request_id) {
+      const helperMeta = (row as {
+        helpers?: { full_name?: string; phone?: string } | null;
+      }).helpers;
       const helperName =
-        payload.helper_name ||
-        (row as { helpers?: { full_name?: string } }).helpers?.full_name ||
-        "Helper";
+        payload.helper_name || helperMeta?.full_name || "Helper";
       await notifySeniorOfExpiry(
         supabase,
         payload.request_id,
         helperName,
         expiryMinutes,
+        helperMeta?.phone ?? null,
       );
     }
     results.push({
@@ -308,7 +271,7 @@ async function loadRequest(
   const { data, error } = await supabase
     .from("consultation_requests")
     .select(
-      "id, status, parent_name, parent_age, area, pincode, appointment_date, appointment_time, doctor_hospital, helper_preference, offer_window_ends_at, location_missing",
+      "id, ref_number, status, parent_name, parent_age, area, pincode, appointment_date, appointment_time, doctor_hospital, helper_preference, offer_window_ends_at, location_missing",
     )
     .eq("id", requestId)
     .maybeSingle();
@@ -609,7 +572,7 @@ Deno.serve(async (req: Request) => {
       const { data: offeredRows, error } = await supabase
         .from("consultation_requests")
         .select(
-          "id, status, parent_name, parent_age, area, pincode, appointment_date, appointment_time, doctor_hospital, helper_preference, offer_window_ends_at, location_missing",
+          "id, ref_number, status, parent_name, parent_age, area, pincode, appointment_date, appointment_time, doctor_hospital, helper_preference, offer_window_ends_at, location_missing",
         )
         .eq("status", "offered");
 

@@ -1,26 +1,33 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import {
-  appointmentConfirmedEmailHtml,
+  appointmentConfirmedEmail,
   createRawToken,
-  guardianHelperAssignedEmailHtml,
-  guardianNewHelperEmailHtml,
+  guardianHelperAssignedEmail,
+  guardianNewHelperEmail,
   type RequestContact,
 } from "../_shared/assignment.ts";
 import {
-  escapeHtml,
+  formatAppointmentDateShort,
+  formatAppointmentTime,
   sendEmail,
 } from "../_shared/email.ts";
 import { resolveSecret } from "../_shared/secrets.ts";
 import {
-  assignButtonHtml,
-  formatRequestSummaryHtml,
+  MANAGER_FIRST_NAME,
+  firstName,
   seniorAssignUrl,
 } from "../_shared/senior.ts";
+import {
+  ON_SCREEN,
+  fillOnScreen,
+} from "../_shared/templates-common.ts";
+import { templateM3 } from "../_shared/templates-m.ts";
 
 type RespondPayload = {
   token?: string;
   action?: string;
+  preview?: boolean;
 };
 
 type HelperDetails = {
@@ -82,9 +89,29 @@ async function sha256Hex(value: string): Promise<string> {
     .join("");
 }
 
+async function loadPreviousHelperFirstName(
+  supabase: ReturnType<typeof createClient>,
+  previousHelperIds: string[] | null | undefined,
+): Promise<string> {
+  const ids = previousHelperIds ?? [];
+  if (!ids.length) return "the previous helper";
+  const lastId = ids[ids.length - 1];
+  const { data } = await supabase
+    .from("helpers")
+    .select("full_name")
+    .eq("id", lastId)
+    .maybeSingle();
+  return firstName(data?.full_name) || "the previous helper";
+}
+
 async function sendAcceptanceEmails(
   supabase: ReturnType<typeof createClient>,
-  request: RequestContact & { id: string; email: string },
+  request: RequestContact & {
+    id: string;
+    email: string;
+    ref_number?: string | null;
+    previous_helper_ids?: string[] | null;
+  },
   helper: HelperDetails,
   isReplacement: boolean,
 ): Promise<{ helper: boolean; guardian: boolean; token_ok: boolean }> {
@@ -109,30 +136,32 @@ async function sendAcceptanceEmails(
   );
   const helperForGuardian = { ...helper, photo_url: photoUrl };
 
-  const helperHtml = appointmentConfirmedEmailHtml(
+  const helperEmail = appointmentConfirmedEmail(
     request,
     helper.full_name,
     token,
   );
-  const guardianHtml = isReplacement
-    ? guardianNewHelperEmailHtml(request, helperForGuardian)
-    : guardianHelperAssignedEmailHtml(request, helperForGuardian);
-  const guardianSubject = isReplacement
-    ? `Your new helper is ${helper.full_name}`
-    : "A helper has been assigned";
+  const oldHelperFirst = isReplacement
+    ? await loadPreviousHelperFirstName(supabase, request.previous_helper_ids)
+    : "";
+  const guardianEmail = isReplacement
+    ? guardianNewHelperEmail(request, helperForGuardian, oldHelperFirst)
+    : guardianHelperAssignedEmail(request, helperForGuardian);
 
   const helperResult = await sendEmail({
     to: helper.email,
     toName: helper.full_name,
-    subject: "Appointment confirmed",
-    html: helperHtml,
+    subject: helperEmail.subject,
+    html: helperEmail.html,
+    text: helperEmail.text,
   });
 
   const guardianResult = await sendEmail({
     to: request.email,
     toName: request.booking_person_name,
-    subject: guardianSubject,
-    html: guardianHtml,
+    subject: guardianEmail.subject,
+    html: guardianEmail.html,
+    text: guardianEmail.text,
   });
 
   return {
@@ -204,39 +233,130 @@ async function notifySeniorOfDecline(
   const { data: request } = await supabase
     .from("consultation_requests")
     .select(
-      "id, parent_name, parent_age, area, pincode, appointment_date, appointment_time, doctor_hospital, helper_preference, needs_senior_reason",
+      "id, ref_number, parent_name, parent_age, area, pincode, appointment_date, appointment_time, doctor_hospital, helper_preference, needs_senior_reason",
     )
     .eq("id", requestId)
     .maybeSingle();
 
   if (!request) return;
 
-  const assignUrl = seniorAssignUrl(requestId);
-  const html = `
-    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937;">
-      <p><strong>${escapeHtml(helperName)}</strong> declined – please assign another helper.</p>
-      ${formatRequestSummaryHtml({
-        parentName: request.parent_name,
-        parentAge: request.parent_age,
-        appointmentDate: request.appointment_date,
-        appointmentTime: request.appointment_time,
-        area: request.area,
-        pincode: request.pincode,
-        doctorHospital: request.doctor_hospital,
-        helperPreference: request.helper_preference,
-        reason: request.needs_senior_reason,
-      })}
-      <p style="margin: 24px 0;">${assignButtonHtml(assignUrl)}</p>
-      <p>Warm regards,<br />ABI Parent Care</p>
-    </div>
-  `;
+  const email = templateM3({
+    ref: String(request.ref_number ?? "–"),
+    manager_first_name: MANAGER_FIRST_NAME,
+    helper_full_name: helperName,
+    parent_name: request.parent_name,
+    appointment_date: request.appointment_date,
+    appointment_time: request.appointment_time,
+    area: request.area,
+    decline_reason: null,
+    assign_url: seniorAssignUrl(requestId),
+  });
 
   await sendEmail({
     to: seniorEmail,
     toName: "Senior coordinator",
-    subject: `${helperName} declined – please assign another`,
-    html,
+    subject: email.subject,
+    html: email.html,
+    text: email.text,
   });
+}
+
+async function previewOffer(
+  supabase: ReturnType<typeof createClient>,
+  tokenHash: string,
+) {
+  const { data: offer } = await supabase
+    .from("helper_offers")
+    .select(
+      "id, status, helper_id, request_id, helpers(full_name), consultation_requests(ref_number, appointment_date, appointment_time, area, pincode, parent_name, status)",
+    )
+    .eq("token_hash", tokenHash)
+    .maybeSingle();
+
+  if (!offer) {
+    return {
+      ok: false,
+      code: "invalid_token",
+      title: ON_SCREEN.link_inactive.title,
+      message: ON_SCREEN.link_inactive.message,
+    };
+  }
+
+  const request = (offer as {
+    consultation_requests?: {
+      ref_number?: string;
+      appointment_date?: string;
+      appointment_time?: string;
+      area?: string | null;
+      pincode?: string | null;
+      status?: string;
+    } | null;
+    helpers?: { full_name?: string } | null;
+    status?: string;
+  }).consultation_requests;
+
+  if (!request || offer.status !== "sent" || request.status === "assigned") {
+    return {
+      ok: false,
+      code: "token_invalid",
+      title: ON_SCREEN.link_inactive.title,
+      message: ON_SCREEN.link_inactive.message,
+    };
+  }
+
+  const vars = {
+    appointment_date_short: formatAppointmentDateShort(
+      request.appointment_date,
+    ),
+    appointment_time: formatAppointmentTime(request.appointment_time) ??
+      String(request.appointment_time ?? ""),
+    area: String(request.area ?? request.pincode ?? "–"),
+    helper_first_name: firstName(
+      (offer as { helpers?: { full_name?: string } | null }).helpers
+        ?.full_name,
+    ),
+    ref: String(request.ref_number ?? "–"),
+  };
+
+  return {
+    ok: true,
+    code: "preview",
+    ref_number: request.ref_number,
+    title: ON_SCREEN.accept_confirm.title,
+    message: fillOnScreen(ON_SCREEN.accept_confirm.message, vars),
+    button: ON_SCREEN.accept_confirm.button,
+    helper_first_name: vars.helper_first_name,
+  };
+}
+
+function mapAcceptScreen(
+  code: string | undefined,
+  helperFirstName: string,
+): { title: string; message: string } {
+  if (code === "accepted") {
+    return {
+      title: ON_SCREEN.accepted.title,
+      message: fillOnScreen(ON_SCREEN.accepted.message, {
+        helper_first_name: helperFirstName,
+      }),
+    };
+  }
+  if (code === "already_taken") {
+    return {
+      title: ON_SCREEN.already_taken.title,
+      message: ON_SCREEN.already_taken.message,
+    };
+  }
+  if (code === "helper_engaged") {
+    return {
+      title: ON_SCREEN.helper_engaged.title,
+      message: ON_SCREEN.helper_engaged.message,
+    };
+  }
+  return {
+    title: ON_SCREEN.link_inactive.title,
+    message: ON_SCREEN.link_inactive.message,
+  };
 }
 
 Deno.serve(async (req: Request) => {
@@ -269,6 +389,19 @@ Deno.serve(async (req: Request) => {
     const tokenHash = await sha256Hex(token);
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
+    if (payload.preview) {
+      if (action === "accept") {
+        return jsonResponse(await previewOffer(supabase, tokenHash));
+      }
+      return jsonResponse({
+        ok: true,
+        code: "preview",
+        title: "Thanks for letting us know",
+        message: "Tap Confirm to decline this visit.",
+        button: "Confirm",
+      });
+    }
+
     if (action === "accept") {
       const { data, error } = await supabase.rpc("accept_helper_offer", {
         p_token_hash: tokenHash,
@@ -276,7 +409,11 @@ Deno.serve(async (req: Request) => {
       if (error) {
         console.error("accept_helper_offer", error);
         return jsonResponse(
-          { ok: false, message: "Could not process acceptance." },
+          {
+            ok: false,
+            title: ON_SCREEN.link_inactive.title,
+            message: "Could not process acceptance.",
+          },
           500,
         );
       }
@@ -290,12 +427,13 @@ Deno.serve(async (req: Request) => {
         is_replacement?: boolean;
       };
 
+      let helperFirstName = "there";
       if (result?.ok && result.request_id && result.helper_id) {
         const [{ data: request }, { data: helper }] = await Promise.all([
           supabase
             .from("consultation_requests")
             .select(
-              "id, parent_name, parent_age, address_line1, street, area, landmark, city, pincode, appointment_date, appointment_time, doctor_hospital, booking_person_name, relationship, email, phone_country_code, phone",
+              "id, ref_number, parent_name, parent_age, address_line1, street, area, landmark, city, pincode, appointment_date, appointment_time, doctor_hospital, booking_person_name, relationship, email, phone_country_code, phone, previous_helper_ids",
             )
             .eq("id", result.request_id)
             .maybeSingle(),
@@ -307,21 +445,28 @@ Deno.serve(async (req: Request) => {
         ]);
 
         if (request && helper) {
+          helperFirstName = firstName(helper.full_name);
           await sendAcceptanceEmails(
             supabase,
-            request as RequestContact & { id: string; email: string },
+            request as RequestContact & {
+              id: string;
+              email: string;
+              ref_number?: string | null;
+              previous_helper_ids?: string[] | null;
+            },
             helper as HelperDetails,
             Boolean(result.is_replacement),
           );
-          // Send any reminders that are already due for this assignment
           await triggerReminders(result.request_id);
         }
       }
 
+      const screen = mapAcceptScreen(result?.code, helperFirstName);
       return jsonResponse({
         ok: Boolean(result?.ok),
         code: result?.code,
-        message: result?.message ?? "Unable to process this offer.",
+        title: screen.title,
+        message: screen.message,
       });
     }
 
@@ -331,7 +476,11 @@ Deno.serve(async (req: Request) => {
     if (error) {
       console.error("decline_helper_offer", error);
       return jsonResponse(
-        { ok: false, message: "Could not process decline." },
+        {
+          ok: false,
+          title: ON_SCREEN.link_inactive.title,
+          message: "Could not process decline.",
+        },
         500,
       );
     }
@@ -364,10 +513,20 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    if (!result?.ok) {
+      return jsonResponse({
+        ok: false,
+        code: result?.code,
+        title: ON_SCREEN.link_inactive.title,
+        message: ON_SCREEN.link_inactive.message,
+      });
+    }
+
     return jsonResponse({
-      ok: Boolean(result?.ok),
+      ok: true,
       code: result?.code,
-      message: result?.message ?? "Unable to process this offer.",
+      title: ON_SCREEN.declined.title,
+      message: ON_SCREEN.declined.message,
     });
   } catch (error) {
     console.error(error);

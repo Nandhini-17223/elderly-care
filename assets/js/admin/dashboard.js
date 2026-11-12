@@ -44,7 +44,7 @@
       sb
         .from("consultation_requests")
         .select(
-          "id, parent_name, area, pincode, appointment_date, appointment_time, status, helper_confirmed_at, assigned_helper_id, helpers:assigned_helper_id(full_name)"
+          "id, ref_number, parent_name, area, pincode, appointment_date, appointment_time, status, helper_confirmed_at, assigned_helper_id, helpers:assigned_helper_id(full_name)"
         )
         .gte("appointment_date", today)
         .lte("appointment_date", end)
@@ -83,8 +83,10 @@
         return (
           "<tr>" +
           "<td><strong>" +
+          esc(row.ref_number || AdminApi.firstName(row.parent_name)) +
+          "</strong><div class='admin-muted'>" +
           esc(AdminApi.firstName(row.parent_name)) +
-          "</strong></td>" +
+          "</div></td>" +
           "<td>" +
           esc(AdminApi.formatIstDate(row.appointment_date)) +
           "<br /><span class='admin-muted'>" +

@@ -170,8 +170,10 @@
       .map(function (j) {
         return (
           "<li><strong>" +
-          esc(j.parent_name) +
-          "</strong> — " +
+          esc(j.ref_number || j.parent_name) +
+          "</strong>" +
+          (j.ref_number ? " · " + esc(j.parent_name) : "") +
+          " — " +
           esc(AdminApi.formatIstDate(j.appointment_date)) +
           " " +
           esc(AdminApi.formatIstTime(j.appointment_time)) +

@@ -1,9 +1,19 @@
 import {
-  escapeHtml,
   formatAppointmentDate,
   formatAppointmentTime,
 } from "./email.ts";
 import { RESPOND_BASE, firstName } from "./senior.ts";
+import type { EmailContent } from "./templates-common.ts";
+import {
+  templateG3,
+  templateG4,
+  templateG5,
+} from "./templates-g.ts";
+import {
+  templateH2,
+  templateH3,
+  templateH4,
+} from "./templates-h.ts";
 
 export type RequestContact = {
   parent_name: string;
@@ -22,6 +32,7 @@ export type RequestContact = {
   phone_country_code: string;
   phone: string;
   email?: string;
+  ref_number?: string | null;
 };
 
 export function fullPickupAddress(request: RequestContact): string {
@@ -29,7 +40,6 @@ export function fullPickupAddress(request: RequestContact): string {
     request.address_line1,
     request.street,
     request.area,
-    request.landmark ? `Landmark: ${request.landmark}` : null,
     request.city,
     request.pincode,
   ]
@@ -85,152 +95,168 @@ export async function createRawToken(): Promise<{ token: string; hash: string }>
   return { token, hash };
 }
 
-export function patientDetailsHtml(
-  request: RequestContact,
-  options?: { includeMaps?: boolean },
-): string {
-  const { dateLabel, timeLabel } = appointmentLabels(request);
-  const address = fullPickupAddress(request);
-  const maps = mapsSearchUrl(address);
-  const phone = familyPhone(request);
-  const includeMaps = options?.includeMaps !== false;
-
-  return `
-    <p>
-      <strong>Patient:</strong> ${escapeHtml(request.parent_name)} (age ${escapeHtml(String(request.parent_age))})<br />
-      <strong>Date:</strong> ${escapeHtml(dateLabel)}<br />
-      <strong>Time:</strong> ${escapeHtml(timeLabel)}<br />
-      <strong>Pickup address:</strong> ${escapeHtml(address)}<br />
-      ${
-    includeMaps
-      ? `<strong>Maps:</strong> <a href="${maps}">${escapeHtml(maps)}</a><br />`
-      : ""
-  }
-      <strong>Doctor / Hospital:</strong> ${escapeHtml(request.doctor_hospital)}<br />
-      <strong>Family contact:</strong> ${escapeHtml(request.booking_person_name)}
-      (${escapeHtml(request.relationship)}) — ${escapeHtml(phone)}
-    </p>
-  `;
-}
-
-export function cantMakeItButtonHtml(token: string): string {
-  const url = actionUrl(token, "cant_make_it");
-  return `<a href="${url}" style="background:#e5e7eb;color:#111827;padding:12px 18px;border-radius:8px;text-decoration:none;display:inline-block;">❌ Can’t make it</a>`;
-}
-
-export function confirmAttendanceButtonHtml(token: string): string {
-  const url = actionUrl(token, "confirm_attendance");
-  return `<a href="${url}" style="background:#15803d;color:#fff;padding:12px 18px;border-radius:8px;text-decoration:none;display:inline-block;margin-right:8px;">✅ I’ll be there</a>`;
-}
-
-export function appointmentConfirmedEmailHtml(
-  request: RequestContact,
-  helperName: string,
-  token: string,
-): string {
-  return `
-    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937;">
-      <p>Hi ${escapeHtml(helperName)},</p>
-      <p>Your appointment is confirmed.</p>
-      ${patientDetailsHtml(request)}
-      <p style="margin: 24px 0;">
-        ${cantMakeItButtonHtml(token)}
-      </p>
-      <p>Warm regards,<br />ABI Parent Care</p>
-    </div>
-  `;
-}
-
-export function reminderEmailHtml(
-  request: RequestContact,
-  helperName: string,
-  token: string,
-  kind: "12h" | "6h",
-): string {
-  const buttons = kind === "6h"
-    ? `${confirmAttendanceButtonHtml(token)}${cantMakeItButtonHtml(token)}`
-    : cantMakeItButtonHtml(token);
-  const lead = kind === "6h"
-    ? "This is your 6-hour reminder for the upcoming appointment."
-    : "This is your 12-hour reminder for the upcoming appointment.";
-
-  return `
-    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937;">
-      <p>Hi ${escapeHtml(helperName)},</p>
-      <p>${lead}</p>
-      ${patientDetailsHtml(request)}
-      <p style="margin: 24px 0;">${buttons}</p>
-      <p>Warm regards,<br />ABI Parent Care</p>
-    </div>
-  `;
-}
-
 export type GuardianHelperInfo = {
   full_name: string;
   phone: string;
   photo_url?: string | null;
 };
 
-function helperPhotoHtml(helper: GuardianHelperInfo): string {
-  if (!helper.photo_url) return "";
-  return `<p><img src="${escapeHtml(helper.photo_url)}" alt="Helper photo" width="160" height="160" style="border-radius:12px;object-fit:cover;display:block;" /></p>`;
+export function appointmentConfirmedEmail(
+  request: RequestContact,
+  helperName: string,
+  token: string,
+): EmailContent {
+  const address = fullPickupAddress(request);
+  return templateH2({
+    ref: String(request.ref_number ?? "–"),
+    helper_first_name: firstName(helperName),
+    parent_name: request.parent_name,
+    parent_age: request.parent_age,
+    address_line1: request.address_line1,
+    street: request.street,
+    area: request.area,
+    city: request.city,
+    pincode: request.pincode,
+    landmark: request.landmark,
+    maps_url: mapsSearchUrl(address),
+    appointment_date: request.appointment_date,
+    appointment_time: request.appointment_time,
+    doctor_hospital: request.doctor_hospital,
+    booking_person_name: request.booking_person_name,
+    relationship: request.relationship,
+    guardian_phone: familyPhone(request),
+    cant_make_it_url: actionUrl(token, "cant_make_it"),
+  });
 }
 
+/** @deprecated use appointmentConfirmedEmail */
+export function appointmentConfirmedEmailHtml(
+  request: RequestContact,
+  helperName: string,
+  token: string,
+): string {
+  return appointmentConfirmedEmail(request, helperName, token).html;
+}
+
+export function reminderEmail(
+  request: RequestContact,
+  helperName: string,
+  token: string,
+  kind: "12h" | "6h",
+): EmailContent {
+  const address = fullPickupAddress(request);
+  const base = {
+    ref: String(request.ref_number ?? "–"),
+    helper_first_name: firstName(helperName),
+    parent_name: request.parent_name,
+    area: request.area,
+    appointment_date: request.appointment_date,
+    appointment_time: request.appointment_time,
+    full_address: address,
+    maps_url: mapsSearchUrl(address),
+    doctor_hospital: request.doctor_hospital,
+    booking_person_name: request.booking_person_name,
+    relationship: request.relationship,
+    guardian_phone: familyPhone(request),
+    cant_make_it_url: actionUrl(token, "cant_make_it"),
+  };
+  if (kind === "6h") {
+    return templateH4({
+      ...base,
+      confirm_url: actionUrl(token, "confirm_attendance"),
+    });
+  }
+  return templateH3(base);
+}
+
+/** @deprecated use reminderEmail */
+export function reminderEmailHtml(
+  request: RequestContact,
+  helperName: string,
+  token: string,
+  kind: "12h" | "6h",
+): string {
+  return reminderEmail(request, helperName, token, kind).html;
+}
+
+export function guardianNewHelperEmail(
+  request: RequestContact,
+  helper: GuardianHelperInfo,
+  oldHelperFirstName: string,
+): EmailContent {
+  return templateG5({
+    ref: String(request.ref_number ?? "–"),
+    booking_person_name: request.booking_person_name,
+    parent_name: request.parent_name,
+    helper_full_name: helper.full_name,
+    helper_phone: helper.phone,
+    helper_photo_url: helper.photo_url,
+    old_helper_first_name: oldHelperFirstName || "the previous helper",
+    appointment_date: request.appointment_date,
+    appointment_time: request.appointment_time,
+    doctor_hospital: request.doctor_hospital,
+  });
+}
+
+/** @deprecated use guardianNewHelperEmail */
 export function guardianNewHelperEmailHtml(
   request: RequestContact,
   helper: GuardianHelperInfo,
+  oldHelperFirstName = "the previous helper",
 ): string {
-  const { dateLabel, timeLabel } = appointmentLabels(request);
-  return `
-    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937;">
-      <p>Hi ${escapeHtml(request.booking_person_name)},</p>
-      <p>Your new helper is <strong>${escapeHtml(helper.full_name)}</strong>, phone ${escapeHtml(helper.phone)}.</p>
-      ${helperPhotoHtml(helper)}
-      <p>
-        <strong>Patient:</strong> ${escapeHtml(request.parent_name)}<br />
-        <strong>Date:</strong> ${escapeHtml(dateLabel)}<br />
-        <strong>Time:</strong> ${escapeHtml(timeLabel)}<br />
-        <strong>Hospital:</strong> ${escapeHtml(request.doctor_hospital)}
-      </p>
-      <p>Warm regards,<br />ABI Parent Care</p>
-    </div>
-  `;
+  return guardianNewHelperEmail(request, helper, oldHelperFirstName).html;
 }
 
+export function guardianHelperAssignedEmail(
+  request: RequestContact,
+  helper: GuardianHelperInfo,
+): EmailContent {
+  return templateG3({
+    ref: String(request.ref_number ?? "–"),
+    booking_person_name: request.booking_person_name,
+    parent_name: request.parent_name,
+    helper_full_name: helper.full_name,
+    helper_phone: helper.phone,
+    helper_photo_url: helper.photo_url,
+    appointment_date: request.appointment_date,
+    appointment_time: request.appointment_time,
+    doctor_hospital: request.doctor_hospital,
+    address_line1: request.address_line1,
+    street: request.street,
+    area: request.area,
+    city: request.city,
+    pincode: request.pincode,
+  });
+}
+
+/** @deprecated use guardianHelperAssignedEmail */
 export function guardianHelperAssignedEmailHtml(
   request: RequestContact,
   helper: GuardianHelperInfo,
 ): string {
-  const { dateLabel, timeLabel } = appointmentLabels(request);
-  return `
-    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937;">
-      <p>Hi ${escapeHtml(request.booking_person_name)},</p>
-      <p>A helper has been assigned for your appointment.</p>
-      ${helperPhotoHtml(helper)}
-      <p>
-        <strong>Helper:</strong> ${escapeHtml(helper.full_name)}<br />
-        <strong>Helper phone:</strong> ${escapeHtml(helper.phone)}<br />
-        <strong>Date:</strong> ${escapeHtml(dateLabel)}<br />
-        <strong>Time:</strong> ${escapeHtml(timeLabel)}<br />
-        <strong>Hospital:</strong> ${escapeHtml(request.doctor_hospital)}
-      </p>
-      <p>Warm regards,<br />ABI Parent Care</p>
-    </div>
-  `;
+  return guardianHelperAssignedEmail(request, helper).html;
 }
 
+export function guardianReplacementArrangingEmail(
+  request: RequestContact,
+  helperFullName: string,
+): EmailContent {
+  return templateG4({
+    ref: String(request.ref_number ?? "–"),
+    booking_person_name: request.booking_person_name,
+    parent_name: request.parent_name,
+    old_helper_first_name: firstName(helperFullName),
+    appointment_date: request.appointment_date,
+    appointment_time: request.appointment_time,
+  });
+}
+
+/** @deprecated use guardianReplacementArrangingEmail */
 export function guardianReplacementArrangingHtml(
   request: RequestContact,
   helperFullName: string,
 ): string {
-  const { dateLabel, timeLabel } = appointmentLabels(request);
-  return `
-    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937;">
-      <p>Hi ${escapeHtml(request.booking_person_name)},</p>
-      <p>${escapeHtml(firstName(helperFullName))} is unable to attend ${escapeHtml(request.parent_name)}’s appointment on ${escapeHtml(dateLabel)} at ${escapeHtml(timeLabel)}. We’re arranging a replacement urgently and will share the new helper’s details shortly.</p>
-      <p>Warm regards,<br />ABI Parent Care</p>
-    </div>
-  `;
+  return guardianReplacementArrangingEmail(request, helperFullName).html;
 }
 
 export function formatRemaining(ms: number): string {

@@ -1,27 +1,25 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient, type SupabaseClient } from "jsr:@supabase/supabase-js@2";
 import {
-  appointmentLabels,
-  formatRemaining,
-  guardianReplacementArrangingHtml,
+  guardianReplacementArrangingEmail,
 } from "../_shared/assignment.ts";
 import {
-  escapeHtml,
   formatAppointmentDate,
   formatAppointmentTime,
   sendEmail,
 } from "../_shared/email.ts";
 import { resolveSecret } from "../_shared/secrets.ts";
 import {
+  MANAGER_FIRST_NAME,
+  RESPOND_BASE,
   approxDistanceLabel,
-  assignButtonHtml,
   firstName,
-  formatRequestSummaryHtml,
   preferenceLabel,
   reasonPlain,
-  RESPOND_BASE,
   seniorAssignUrl,
 } from "../_shared/senior.ts";
+import { templateH1 } from "../_shared/templates-h.ts";
+import { templateM5 } from "../_shared/templates-m.ts";
 import { requireStaff, writeAudit } from "../_shared/staff-auth.ts";
 
 type ApiPayload = {
@@ -32,6 +30,7 @@ type ApiPayload = {
 
 type RequestRow = {
   id: string;
+  ref_number?: string | null;
   status: string;
   parent_name: string;
   parent_age: number;
@@ -190,45 +189,31 @@ async function sendOfferEmail(
   token: string,
   distanceKm: number | null,
 ): Promise<boolean> {
-  const dateLabel = formatAppointmentDate(request.appointment_date) ??
-    request.appointment_date;
-  const timeLabel = formatAppointmentTime(request.appointment_time) ??
-    request.appointment_time;
-  const area = [request.area, request.pincode].filter(Boolean).join(" · ") ||
-    "Area on file";
-  const subject = `New appointment near you – ${dateLabel}, ${timeLabel}`;
   const acceptUrl =
     `${RESPOND_BASE}?token=${encodeURIComponent(token)}&action=accept`;
   const declineUrl =
     `${RESPOND_BASE}?token=${encodeURIComponent(token)}&action=decline`;
 
-  const html = `
-    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937;">
-      <p>Hi ${escapeHtml(helper.full_name)},</p>
-      <p>A new appointment is available near you.</p>
-      <p>
-        <strong>Date:</strong> ${escapeHtml(dateLabel)}<br />
-        <strong>Time:</strong> ${escapeHtml(timeLabel)}<br />
-        <strong>Area:</strong> ${escapeHtml(area)}<br />
-        <strong>Approx. distance:</strong> ${escapeHtml(approxDistanceLabel(distanceKm))}<br />
-        <strong>Doctor / Hospital:</strong> ${escapeHtml(request.doctor_hospital)}<br />
-        <strong>Patient age:</strong> ${escapeHtml(String(request.parent_age))}<br />
-        <strong>Helper preference:</strong> ${escapeHtml(preferenceLabel(request.helper_preference))}
-      </p>
-      <p><em>Full address and family contact will be shared after you accept.</em></p>
-      <p style="margin: 24px 0;">
-        <a href="${acceptUrl}" style="background:#1d6fd8;color:#fff;padding:12px 18px;border-radius:8px;text-decoration:none;display:inline-block;margin-right:8px;">Accept</a>
-        <a href="${declineUrl}" style="background:#e5e7eb;color:#111827;padding:12px 18px;border-radius:8px;text-decoration:none;display:inline-block;">Decline</a>
-      </p>
-      <p>Warm regards,<br />ABI Parent Care</p>
-    </div>
-  `;
+  const email = templateH1({
+    ref: String(request.ref_number ?? "–"),
+    helper_first_name: firstName(helper.full_name),
+    appointment_date: request.appointment_date,
+    appointment_time: request.appointment_time,
+    area: request.area,
+    pincode: request.pincode,
+    distance_km: distanceKm,
+    doctor_hospital: request.doctor_hospital,
+    parent_age: request.parent_age,
+    accept_url: acceptUrl,
+    decline_url: declineUrl,
+  });
 
   const result = await sendEmail({
     to: helper.email,
     toName: helper.full_name,
-    subject,
-    html,
+    subject: email.subject,
+    html: email.html,
+    text: email.text,
   });
   return result.ok;
 }
@@ -237,7 +222,7 @@ async function listNeedsSenior(supabase: SupabaseClient) {
   const { data, error } = await supabase
     .from("consultation_requests")
     .select(
-      "id, status, parent_name, parent_age, area, pincode, appointment_date, appointment_time, doctor_hospital, helper_preference, needs_senior_reason, created_at",
+      "id, ref_number, status, parent_name, parent_age, area, pincode, appointment_date, appointment_time, doctor_hospital, helper_preference, needs_senior_reason, created_at",
     )
     .eq("status", "needs_senior")
     .order("appointment_date", { ascending: true })
@@ -260,7 +245,7 @@ async function getRequestDetail(
   const { data: request, error } = await supabase
     .from("consultation_requests")
     .select(
-      "id, status, parent_name, parent_age, address_line1, street, area, landmark, city, pincode, appointment_date, appointment_time, doctor_hospital, helper_preference, needs_senior_reason, booking_person_name, relationship, email, phone_country_code, phone, created_at, assigned_helper_id, assigned_at, senior_notified_at, guardian_arranging_sent_at, helper_confirmed_at, confirmed_by, helper_dropped_at, previous_helper_ids",
+      "id, ref_number, status, parent_name, parent_age, address_line1, street, area, landmark, city, pincode, appointment_date, appointment_time, doctor_hospital, helper_preference, needs_senior_reason, booking_person_name, relationship, email, phone_country_code, phone, created_at, assigned_helper_id, assigned_at, senior_notified_at, guardian_arranging_sent_at, helper_confirmed_at, confirmed_by, helper_dropped_at, previous_helper_ids",
     )
     .eq("id", requestId)
     .maybeSingle();
@@ -389,7 +374,7 @@ async function notifyDropoutEmails(
     supabase
       .from("consultation_requests")
       .select(
-        "id, parent_name, parent_age, area, pincode, appointment_date, appointment_time, doctor_hospital, helper_preference, needs_senior_reason, booking_person_name, email, address_line1, street, landmark, city",
+        "id, ref_number, parent_name, parent_age, area, pincode, appointment_date, appointment_time, doctor_hospital, helper_preference, needs_senior_reason, booking_person_name, relationship, phone_country_code, phone, email, address_line1, street, landmark, city",
       )
       .eq("id", requestId)
       .maybeSingle(),
@@ -402,73 +387,63 @@ async function notifyDropoutEmails(
   if (!request || !helper) return;
 
   const seniorEmail = await resolveSecret(supabase, "SENIOR_EMAIL");
-  const { dateLabel, timeLabel } = appointmentLabels(request);
-  const patientFirst = firstName(request.parent_name);
 
   if (seniorEmail) {
-    const apptMs = Date.parse(
-      `${request.appointment_date}T${
-        String(request.appointment_time).slice(0, 8)
-      }+05:30`,
-    );
-    const remaining = Number.isFinite(apptMs)
-      ? formatRemaining(apptMs - Date.now())
-      : "soon";
-    const assignUrl = seniorAssignUrl(requestId);
+    const email = templateM5({
+      ref: String(request.ref_number ?? "–"),
+      manager_first_name: MANAGER_FIRST_NAME,
+      helper_full_name: helper.full_name,
+      parent_name: request.parent_name,
+      parent_age: request.parent_age,
+      appointment_date: request.appointment_date,
+      appointment_time: request.appointment_time,
+      area: request.area,
+      city: request.city,
+      pincode: request.pincode,
+      doctor_hospital: request.doctor_hospital,
+      booking_person_name: request.booking_person_name,
+      relationship: String(request.relationship ?? ""),
+      guardian_phone: `${request.phone_country_code ?? ""} ${request.phone ?? ""}`.trim(),
+      dropout_reason: reasonLabel,
+      assign_url: seniorAssignUrl(requestId),
+    });
     await sendEmail({
       to: seniorEmail,
       toName: "Senior coordinator",
-      subject:
-        `URGENT: ${helper.full_name} can’t attend – ${patientFirst}, ${dateLabel} ${timeLabel}`,
-      html: `
-        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937;">
-          <p><strong>URGENT:</strong> ${escapeHtml(helper.full_name)} can’t attend – ${escapeHtml(patientFirst)}, ${escapeHtml(dateLabel)} ${escapeHtml(timeLabel)}</p>
-          <p><strong>Reason:</strong> ${escapeHtml(reasonLabel)}</p>
-          <p><strong>Time remaining:</strong> ${escapeHtml(remaining)}</p>
-          ${
-        formatRequestSummaryHtml({
-          parentName: request.parent_name,
-          parentAge: request.parent_age,
-          appointmentDate: request.appointment_date,
-          appointmentTime: request.appointment_time,
-          area: request.area,
-          pincode: request.pincode,
-          doctorHospital: request.doctor_hospital,
-          helperPreference: request.helper_preference,
-          reason: request.needs_senior_reason,
-        })
-      }
-          <p style="margin: 24px 0;">${assignButtonHtml(assignUrl)}</p>
-          <p>Warm regards,<br />ABI Parent Care</p>
-        </div>
-      `,
+      subject: email.subject,
+      html: email.html,
+      text: email.text,
     });
   }
 
+  const guardianEmail = guardianReplacementArrangingEmail(
+    {
+      parent_name: request.parent_name,
+      parent_age: request.parent_age,
+      address_line1: request.address_line1,
+      street: request.street,
+      area: request.area,
+      landmark: request.landmark,
+      city: request.city,
+      pincode: request.pincode,
+      appointment_date: request.appointment_date,
+      appointment_time: request.appointment_time,
+      doctor_hospital: request.doctor_hospital,
+      booking_person_name: request.booking_person_name,
+      relationship: String(request.relationship ?? ""),
+      phone_country_code: String(request.phone_country_code ?? ""),
+      phone: String(request.phone ?? ""),
+      email: request.email,
+      ref_number: request.ref_number,
+    },
+    helper.full_name,
+  );
   await sendEmail({
     to: request.email,
     toName: request.booking_person_name,
-    subject: `${firstName(helper.full_name)} is unable to attend – arranging replacement`,
-    html: guardianReplacementArrangingHtml(
-      {
-        parent_name: request.parent_name,
-        parent_age: request.parent_age,
-        address_line1: request.address_line1,
-        street: request.street,
-        area: request.area,
-        landmark: request.landmark,
-        city: request.city,
-        pincode: request.pincode,
-        appointment_date: request.appointment_date,
-        appointment_time: request.appointment_time,
-        doctor_hospital: request.doctor_hospital,
-        booking_person_name: request.booking_person_name,
-        relationship: "",
-        phone_country_code: "",
-        phone: "",
-      },
-      helper.full_name,
-    ),
+    subject: guardianEmail.subject,
+    html: guardianEmail.html,
+    text: guardianEmail.text,
   });
 }
 

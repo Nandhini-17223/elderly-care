@@ -1,16 +1,16 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import {
-  escapeHtml,
-  formatAppointmentDateTime,
-  sendEmail,
-} from "../_shared/email.ts";
+import { sendEmail } from "../_shared/email.ts";
+import { templateG1 } from "../_shared/templates-g.ts";
 
 type ConsultationRecord = {
   id: string;
+  ref_number?: string | null;
   parent_name: string;
   parent_age: number;
   city: string;
+  area?: string | null;
+  pincode?: string | null;
   booking_person_name: string;
   relationship: string;
   email: string;
@@ -49,7 +49,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const payload = (await req.json()) as WebhookPayload | ConsultationRecord;
-    const record: ConsultationRecord | undefined =
+    let record: ConsultationRecord | undefined =
       "record" in payload && payload.record
         ? payload.record
         : "email" in payload && "id" in payload
@@ -63,43 +63,38 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const bookingName = escapeHtml(record.booking_person_name);
-    const parentName = escapeHtml(record.parent_name);
-    const parentAge = escapeHtml(String(record.parent_age));
-    const city = escapeHtml(record.city);
-    const doctorHospital = escapeHtml(
-      String(record.doctor_hospital ?? "").trim() || "Not provided",
-    );
-    const appointmentLabel = formatAppointmentDateTime(
-      record.appointment_date,
-      record.appointment_time,
-    );
-    const appointmentHtml = appointmentLabel
-      ? escapeHtml(appointmentLabel)
-      : "Not provided";
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    const html = `
-      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937;">
-        <p>Hi ${bookingName},</p>
-        <p>
-          Thank you for requesting a consultation with <strong>ABI Parent Care</strong>.
-          We have received your request for
-          <strong>${parentName}</strong> (age ${parentAge}) in <strong>${city}</strong>.
-        </p>
-        <p>
-          Appointment: <strong>${appointmentHtml}</strong><br />
-          Doctor / Hospital: <strong>${doctorHospital}</strong>
-        </p>
-        <p>Our care advisor will contact you within 24 hours.</p>
-        <p>Warm regards,<br />ABI Parent Care</p>
-      </div>
-    `;
+    // Ensure we have ref_number and latest fields (webhook payload may be stale)
+    const { data: fresh, error: loadError } = await supabase
+      .from("consultation_requests")
+      .select(
+        "id, ref_number, parent_name, parent_age, city, area, pincode, booking_person_name, email, appointment_date, appointment_time, doctor_hospital, helper_preference",
+      )
+      .eq("id", record.id)
+      .maybeSingle();
+    if (loadError) throw loadError;
+    if (fresh) record = { ...record, ...fresh };
+
+    const email = templateG1({
+      ref: String(record.ref_number ?? "–"),
+      booking_person_name: record.booking_person_name,
+      parent_name: record.parent_name,
+      appointment_date: String(record.appointment_date ?? ""),
+      appointment_time: String(record.appointment_time ?? ""),
+      doctor_hospital: String(record.doctor_hospital ?? ""),
+      area: record.area,
+      city: record.city,
+      pincode: record.pincode,
+      helper_preference: record.helper_preference,
+    });
 
     const emailResult = await sendEmail({
       to: record.email,
       toName: record.booking_person_name,
-      subject: "We received your consultation request",
-      html,
+      subject: email.subject,
+      html: email.html,
+      text: email.text,
     });
 
     if (!emailResult.ok) {
@@ -112,7 +107,6 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const supabase = createClient(supabaseUrl, serviceRoleKey);
     const { error: updateError } = await supabase
       .from("consultation_requests")
       .update({ email_sent_at: new Date().toISOString() })

@@ -23,7 +23,7 @@
     const { data: request, error } = await sb
       .from("consultation_requests")
       .select(
-        "id, status, parent_name, parent_age, address_line1, street, area, landmark, city, pincode, appointment_date, appointment_time, doctor_hospital, helper_preference, needs_senior_reason, booking_person_name, relationship, email, phone_country_code, phone, created_at, assigned_helper_id, assigned_at, senior_notified_at, guardian_arranging_sent_at, helper_confirmed_at, confirmed_by, helper_dropped_at, previous_helper_ids, reminder_12h_sent_at, reminder_6h_sent_at, helpers:assigned_helper_id(full_name, phone, email)"
+        "id, ref_number, status, parent_name, parent_age, address_line1, street, area, landmark, city, pincode, appointment_date, appointment_time, doctor_hospital, helper_preference, needs_senior_reason, booking_person_name, relationship, email, phone_country_code, phone, created_at, assigned_helper_id, assigned_at, senior_notified_at, guardian_arranging_sent_at, helper_confirmed_at, confirmed_by, helper_dropped_at, previous_helper_ids, reminder_12h_sent_at, reminder_6h_sent_at, helpers:assigned_helper_id(full_name, phone, email)"
       )
       .eq("id", id)
       .maybeSingle();
@@ -39,7 +39,8 @@
       .order("sent_at", { ascending: true });
     if (offersError) throw offersError;
 
-    document.querySelector("#detail-title").textContent = request.parent_name;
+    document.querySelector("#detail-title").textContent =
+      (request.ref_number ? request.ref_number + " · " : "") + request.parent_name;
     document.querySelector("#detail-sub").textContent =
       "Status: " +
       request.status +
@@ -125,7 +126,9 @@
       : "<li>No timeline events yet.</li>";
 
     document.querySelector("#detail-body").innerHTML =
-      "<p><strong>Patient:</strong> " +
+      "<p><strong>Ref:</strong> " +
+      esc(request.ref_number || "—") +
+      "<br /><strong>Patient:</strong> " +
       esc(request.parent_name) +
       " (age " +
       esc(String(request.parent_age)) +

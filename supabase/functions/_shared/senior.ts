@@ -3,6 +3,11 @@ import {
   formatAppointmentDate,
   formatAppointmentTime,
 } from "./email.ts";
+import {
+  firstName,
+  preferenceLabel,
+  reasonPlain,
+} from "./templates-common.ts";
 
 export const ADMIN_PAGE_BASE =
   "https://nandhini-17223.github.io/elderly-care/admin";
@@ -10,42 +15,27 @@ export const ADMIN_PAGE_BASE =
 export const RESPOND_BASE =
   "https://nandhini-17223.github.io/elderly-care/respond.html";
 
-export function firstName(fullName: string | null | undefined): string {
-  const trimmed = String(fullName ?? "").trim();
-  if (!trimmed) return "Patient";
-  return trimmed.split(/\s+/)[0] ?? trimmed;
-}
+export const HELPER_PORTAL_BASE =
+  "https://nandhini-17223.github.io/elderly-care/admin/helper.html";
 
-export function preferenceLabel(value: string | null | undefined): string {
-  if (value === "female") return "Female helper";
-  if (value === "male") return "Male helper";
-  return "No preference";
-}
+export { firstName, preferenceLabel, reasonPlain };
 
-export function reasonPlain(reason: string | null | undefined): string {
-  switch (reason) {
-    case "short_notice":
-      return "Short notice (less than 4 hours before the appointment)";
-    case "no_acceptance":
-      return "No helper accepted within the offer window";
-    case "no_suitable_helpers":
-      return "No suitable helpers available";
-    case "all_declined":
-      return "All helpers declined";
-    case "helper_dropped":
-      return "Helper dropped out (can’t make it)";
-    case "helper_not_confirmed":
-      return "Helper did not confirm attendance";
-    case "helper_unavailable":
-      return "Helper unavailable (deactivated, rejected, or DL expired)";
-    default:
-      return reason ? reason.replaceAll("_", " ") : "Needs senior attention";
-  }
-}
+export const MANAGER_FIRST_NAME = "Manager";
 
 /** Portal deep link: login first, then return to the request. */
 export function seniorAssignUrl(requestId: string): string {
   const next = `needs-action.html?request=${encodeURIComponent(requestId)}`;
+  return `${ADMIN_PAGE_BASE}/login.html?next=${encodeURIComponent(next)}`;
+}
+
+export function needsActionUrl(): string {
+  return `${ADMIN_PAGE_BASE}/login.html?next=${
+    encodeURIComponent("needs-action.html")
+  }`;
+}
+
+export function helperProfileUrl(helperId: string): string {
+  const next = `helper.html?id=${encodeURIComponent(helperId)}`;
   return `${ADMIN_PAGE_BASE}/login.html?next=${encodeURIComponent(next)}`;
 }
 
@@ -64,6 +54,7 @@ export function formatRequestSummaryHtml(args: {
   helperPreference?: string | null;
   reason?: string | null;
   address?: string | null;
+  refNumber?: string | null;
 }): string {
   const dateLabel = formatAppointmentDate(args.appointmentDate) ??
     args.appointmentDate;
@@ -74,6 +65,7 @@ export function formatRequestSummaryHtml(args: {
 
   return `
     <p>
+      ${args.refNumber ? `<strong>Ref:</strong> ${escapeHtml(args.refNumber)}<br />` : ""}
       <strong>Patient:</strong> ${escapeHtml(args.parentName)} (age ${escapeHtml(String(args.parentAge))})<br />
       <strong>Date:</strong> ${escapeHtml(dateLabel)}<br />
       <strong>Time:</strong> ${escapeHtml(timeLabel)}<br />
@@ -90,4 +82,8 @@ export function approxDistanceLabel(km: number | null | undefined): string {
   if (km == null || Number.isNaN(Number(km))) return "Nearby";
   const rounded = Math.round(Number(km) * 10) / 10;
   return `~${rounded} km`;
+}
+
+export function reminderStatusLabel(sentAt: string | null | undefined): string {
+  return sentAt ? "sent" : "not sent";
 }

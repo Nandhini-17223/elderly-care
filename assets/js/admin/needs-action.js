@@ -59,8 +59,10 @@
           esc(requestListUrl(row.id)) +
           '">' +
           '<span class="senior-request-main"><strong>' +
+          esc(row.ref_number || row.id) +
+          "</strong> · " +
           esc(row.parent_name) +
-          "</strong> · age " +
+          " · age " +
           esc(String(row.parent_age)) +
           "</span>" +
           '<span class="senior-request-meta">' +
@@ -93,7 +95,7 @@
       request.status === "needs_senior" || request.status === "senior_offered";
 
     setStatus(
-      request.parent_name,
+      (request.ref_number ? request.ref_number + " · " : "") + request.parent_name,
       "Age " +
         request.parent_age +
         " · " +
