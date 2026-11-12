@@ -12,6 +12,7 @@ import {
   formatRequestSummaryHtml,
   seniorAssignUrl,
 } from "../_shared/senior.ts";
+import { loadAppSettings, settingInt } from "../_shared/staff-auth.ts";
 
 const RESPOND_BASE =
   "https://nandhini-17223.github.io/elderly-care/respond.html";
@@ -172,9 +173,8 @@ async function notifySeniorOfExpiry(
   expiryMinutes = 60,
 ) {
   const seniorEmail = await resolveSecret(supabase, "SENIOR_EMAIL");
-  const accessKey = await resolveSecret(supabase, "SENIOR_ACCESS_KEY");
-  if (!seniorEmail || !accessKey) {
-    console.error("Missing SENIOR_EMAIL or SENIOR_ACCESS_KEY for expiry alert");
+  if (!seniorEmail) {
+    console.error("Missing SENIOR_EMAIL for expiry alert");
     return;
   }
 
@@ -187,7 +187,7 @@ async function notifySeniorOfExpiry(
     .eq("id", requestId)
     .maybeSingle();
 
-  const assignUrl = seniorAssignUrl(accessKey, requestId);
+  const assignUrl = seniorAssignUrl(requestId);
   const windowLabel = expiryMinutes === 15 ? "15 minutes" : "1 hour";
   const html = `
     <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937;">
@@ -218,8 +218,13 @@ async function notifySeniorOfExpiry(
 
 async function expireStaleSeniorOffers(
   supabase: SupabaseClient,
+  settings: Record<string, string>,
 ): Promise<Record<string, unknown>[]> {
-  // Fetch open senior offers with appointment timing so urgent (<3h) expire in 15m.
+  // Fetch open senior offers; urgent window + expiry come from app_settings.
+  const engagedHours = settingInt(settings, "engaged_window_hours", 3);
+  const urgentExpiry = settingInt(settings, "urgent_offer_expiry_minutes", 15);
+  const normalExpiry = settingInt(settings, "senior_offer_expiry_minutes", 60);
+
   const { data, error } = await supabase
     .from("helper_offers")
     .select(
@@ -253,7 +258,9 @@ async function expireStaleSeniorOffers(
     if (!Number.isFinite(apptMs)) continue;
 
     const hoursToApptAtSend = (apptMs - sentAt) / 3600000;
-    const expiryMinutes = hoursToApptAtSend < 3 ? 15 : 60;
+    const expiryMinutes = hoursToApptAtSend < engagedHours
+      ? urgentExpiry
+      : normalExpiry;
     if (now - sentAt < expiryMinutes * 60 * 1000) {
       continue;
     }
@@ -442,10 +449,14 @@ async function processRequest(
     limit?: number;
     waveNumber?: number;
   },
+  settings: Record<string, string> = {},
 ): Promise<Record<string, unknown>> {
   if (request.status !== "offered") {
     return { request_id: request.id, skipped: true, reason: "not_offered" };
   }
+
+  const waveGap = settingInt(settings, "wave_gap_minutes", 15);
+  const waveSize = settingInt(settings, "wave_size", 10);
 
   const now = new Date();
   if (
@@ -487,7 +498,7 @@ async function processRequest(
 
   if (!offerNext && !force && stats.maxWave > 0 && stats.lastSentAt) {
     const elapsed = minutesBetween(stats.lastSentAt, now.toISOString());
-    if (elapsed < 15) {
+    if (elapsed < waveGap) {
       return {
         request_id: request.id,
         skipped: true,
@@ -497,7 +508,7 @@ async function processRequest(
     }
   }
 
-  const limit = offerNext ? 1 : (options.limit ?? 10);
+  const limit = offerNext ? 1 : (options.limit ?? waveSize);
   const helpers = await findSuitableHelpers(supabase, request.id, limit);
 
   if (helpers.length === 0) {
@@ -576,8 +587,9 @@ Deno.serve(async (req: Request) => {
       payload = {};
     }
 
+    const settings = await loadAppSettings(supabase);
     const results: Record<string, unknown>[] = [];
-    const seniorExpiry = await expireStaleSeniorOffers(supabase);
+    const seniorExpiry = await expireStaleSeniorOffers(supabase, settings);
 
     if (payload.request_id) {
       const request = await loadRequest(supabase, payload.request_id);
@@ -590,7 +602,7 @@ Deno.serve(async (req: Request) => {
           offerNext: payload.offer_next,
           limit: payload.limit,
           waveNumber: payload.wave_number,
-        }),
+        }, settings),
       );
     } else {
       // Expire windows first
@@ -609,7 +621,7 @@ Deno.serve(async (req: Request) => {
         results.push(
           await processRequest(supabase, row, {
             force: payload.force,
-          }),
+          }, settings),
         );
       }
     }

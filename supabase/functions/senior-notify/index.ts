@@ -156,16 +156,10 @@ Deno.serve(async (req: Request) => {
       !request.senior_notified_at
     ) {
       const seniorEmail = await resolveSecret(supabase, "SENIOR_EMAIL");
-      const accessKey = await resolveSecret(supabase, "SENIOR_ACCESS_KEY");
       if (!seniorEmail) {
         results.senior_urgent = { ok: false, error: "SENIOR_EMAIL missing" };
-      } else if (!accessKey) {
-        results.senior_urgent = {
-          ok: false,
-          error: "SENIOR_ACCESS_KEY missing",
-        };
       } else {
-        const assignUrl = seniorAssignUrl(accessKey, request.id);
+        const assignUrl = seniorAssignUrl(request.id);
         const seniorHtml = `
           <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937;">
             <p><strong>URGENT:</strong> A consultation request needs a helper on short notice.</p>

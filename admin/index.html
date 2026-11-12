@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Dashboard | ABI Staff Portal</title>
+    <meta name="robots" content="noindex, nofollow" />
+    <link rel="icon" href="../assets/img/logo.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="../assets/css/styles.css" />
+    <link rel="stylesheet" href="../assets/css/admin.css" />
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script defer src="../assets/js/admin/config.js"></script>
+    <script defer src="../assets/js/admin/auth.js"></script>
+    <script defer src="../assets/js/admin/api.js"></script>
+    <script defer src="../assets/js/admin/dashboard.js"></script>
+  </head>
+  <body class="admin-page">
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="topbar">
+      <div class="container">
+        <nav class="nav" aria-label="Primary">
+          <a class="brand" href="index.html" aria-label="Staff portal home">
+            <svg class="brand-icon" viewBox="0 0 48 48" aria-hidden="true">
+              <path fill="#1d6fd8" d="M24 42l-2.5-2.2C11 32.8 6 28.5 6 22c0-5 4-9 9-9 2.2 0 4.2.9 5.6 2.3 1.4-1.4 3.4-2.3 5.6-2.3 5 0 9 4 9 9 0 6.5-5 10.8-15.5 17.8L24 42z"/>
+              <path stroke="#4a9cf7" stroke-width="2" stroke-linecap="round" fill="none" d="M24 20v16M18 28h12"/>
+            </svg>
+            <span class="brand-text"><strong>ABI</strong><br /><span>PARENT CARE</span></span>
+          </a>
+          <div class="admin-nav" data-admin-nav></div>
+        </nav>
+        <div class="admin-userbar">
+          <span data-admin-user></span>
+          <button type="button" class="book-secondary-btn" data-admin-logout>Log out</button>
+        </div>
+      </div>
+    </header>
+
+    <main id="main" class="admin-shell">
+      <div class="container">
+        <div class="admin-card">
+          <h1>Dashboard</h1>
+          <p class="book-field-hint">Today and the next 7 days · Asia/Kolkata</p>
+          <div class="book-form-message" id="dash-message" role="status" aria-live="polite" hidden></div>
+          <div class="admin-stats" id="dash-stats">
+            <div class="admin-stat"><strong id="stat-needs">—</strong><span>Needs action</span></div>
+            <div class="admin-stat"><strong id="stat-offered">—</strong><span>Offered</span></div>
+            <div class="admin-stat"><strong id="stat-assigned">—</strong><span>Assigned</span></div>
+            <div class="admin-stat"><strong id="stat-cancelled">—</strong><span>Cancelled</span></div>
+          </div>
+          <h2 class="admin-section-title">Upcoming visits</h2>
+          <div class="admin-table-wrap">
+            <table class="admin-table" id="dash-table">
+              <thead>
+                <tr>
+                  <th>Patient</th>
+                  <th>When</th>
+                  <th>Area</th>
+                  <th>Helper</th>
+                  <th>Confirmation</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="dash-rows">
+                <tr><td colspan="6" class="admin-empty">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+  </body>
+</html>

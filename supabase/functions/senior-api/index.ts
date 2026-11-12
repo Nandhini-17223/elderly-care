@@ -11,7 +11,7 @@ import {
   formatAppointmentTime,
   sendEmail,
 } from "../_shared/email.ts";
-import { resolveSecret, timingSafeEqual } from "../_shared/secrets.ts";
+import { resolveSecret } from "../_shared/secrets.ts";
 import {
   approxDistanceLabel,
   assignButtonHtml,
@@ -22,9 +22,9 @@ import {
   RESPOND_BASE,
   seniorAssignUrl,
 } from "../_shared/senior.ts";
+import { requireStaff, writeAudit } from "../_shared/staff-auth.ts";
 
 type ApiPayload = {
-  key?: string;
   action?: string;
   request_id?: string;
   helper_id?: string;
@@ -180,15 +180,6 @@ function buildWarnings(
     warnings.push("⚠ Already declined this request");
   }
   return warnings;
-}
-
-async function assertSeniorKey(
-  supabase: SupabaseClient,
-  provided: string,
-): Promise<boolean> {
-  const expected = await resolveSecret(supabase, "SENIOR_ACCESS_KEY");
-  if (!expected) return false;
-  return timingSafeEqual(provided, expected);
 }
 
 async function sendOfferEmail(
@@ -404,11 +395,10 @@ async function notifyDropoutEmails(
   if (!request || !helper) return;
 
   const seniorEmail = await resolveSecret(supabase, "SENIOR_EMAIL");
-  const accessKey = await resolveSecret(supabase, "SENIOR_ACCESS_KEY");
   const { dateLabel, timeLabel } = appointmentLabels(request);
   const patientFirst = firstName(request.parent_name);
 
-  if (seniorEmail && accessKey) {
+  if (seniorEmail) {
     const apptMs = Date.parse(
       `${request.appointment_date}T${
         String(request.appointment_time).slice(0, 8)
@@ -417,7 +407,7 @@ async function notifyDropoutEmails(
     const remaining = Number.isFinite(apptMs)
       ? formatRemaining(apptMs - Date.now())
       : "soon";
-    const assignUrl = seniorAssignUrl(accessKey, requestId);
+    const assignUrl = seniorAssignUrl(requestId);
     await sendEmail({
       to: seniorEmail,
       toName: "Senior coordinator",
@@ -616,18 +606,15 @@ Deno.serve(async (req: Request) => {
     }
 
     const payload = (await req.json().catch(() => ({}))) as ApiPayload;
-    const key = String(payload.key ?? "").trim();
     const action = String(payload.action ?? "list").trim().toLowerCase();
 
-    if (!key) {
-      return jsonResponse({ ok: false, error: "Unauthorized" }, 401);
-    }
-
     const supabase = createClient(supabaseUrl, serviceRoleKey);
-    const allowed = await assertSeniorKey(supabase, key);
-    if (!allowed) {
-      return jsonResponse({ ok: false, error: "Unauthorized" }, 401);
+    const staffOrError = await requireStaff(req, supabase);
+    if ("error" in staffOrError) {
+      // SENIOR_ACCESS_KEY is no longer accepted — JWT + staff role required.
+      return staffOrError.error;
     }
+    const staff = staffOrError;
 
     if (action === "list") {
       const requests = await listNeedsSenior(supabase);
@@ -656,6 +643,12 @@ Deno.serve(async (req: Request) => {
         );
       }
       const result = await sendSeniorOffer(supabase, requestId, helperId);
+      if (result.ok) {
+        await writeAudit(supabase, staff, "send_offer", "consultation_request", requestId, {
+          helper_id: helperId,
+          offer_id: result.offer_id,
+        });
+      }
       const status = result.ok
         ? 200
         : result.code === "helper_busy" || result.code === "helper_dropped_before"
@@ -678,6 +671,16 @@ Deno.serve(async (req: Request) => {
         code?: string;
         message?: string;
       };
+      if (result?.ok) {
+        await writeAudit(
+          supabase,
+          staff,
+          "confirm_by_phone",
+          "consultation_request",
+          requestId,
+          {},
+        );
+      }
       return jsonResponse({
         ok: Boolean(result?.ok),
         code: result?.code,
@@ -724,6 +727,14 @@ Deno.serve(async (req: Request) => {
           requestId,
           result.helper_id,
           "helper_not_confirmed",
+        );
+        await writeAudit(
+          supabase,
+          staff,
+          "helper_unable_reassign",
+          "consultation_request",
+          requestId,
+          { helper_id: result.helper_id },
         );
       }
 
