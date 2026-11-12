@@ -163,9 +163,8 @@ async function notifySeniorOfDecline(
   helperName: string,
 ) {
   const seniorEmail = await resolveSecret(supabase, "SENIOR_EMAIL");
-  const accessKey = await resolveSecret(supabase, "SENIOR_ACCESS_KEY");
-  if (!seniorEmail || !accessKey) {
-    console.error("Missing SENIOR_EMAIL or SENIOR_ACCESS_KEY for decline alert");
+  if (!seniorEmail) {
+    console.error("Missing SENIOR_EMAIL for decline alert");
     return;
   }
 
@@ -179,7 +178,7 @@ async function notifySeniorOfDecline(
 
   if (!request) return;
 
-  const assignUrl = seniorAssignUrl(accessKey, requestId);
+  const assignUrl = seniorAssignUrl(requestId);
   const html = `
     <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937;">
       <p><strong>${escapeHtml(helperName)}</strong> declined – please assign another helper.</p>

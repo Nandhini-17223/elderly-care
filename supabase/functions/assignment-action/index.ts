@@ -63,12 +63,11 @@ async function notifyDropoutEmails(
   if (!request || !helper) return { senior: false, guardian: false };
 
   const seniorEmail = await resolveSecret(supabase, "SENIOR_EMAIL");
-  const accessKey = await resolveSecret(supabase, "SENIOR_ACCESS_KEY");
   const { dateLabel, timeLabel } = appointmentLabels(request);
   const patientFirst = firstName(request.parent_name);
 
   let seniorOk = false;
-  if (seniorEmail && accessKey) {
+  if (seniorEmail) {
     const apptMs = Date.parse(
       // Approximate IST wall clock as UTC+5:30 for remaining time display
       `${request.appointment_date}T${
@@ -78,7 +77,7 @@ async function notifyDropoutEmails(
     const remaining = Number.isFinite(apptMs)
       ? formatRemaining(apptMs - Date.now())
       : "soon";
-    const assignUrl = seniorAssignUrl(accessKey, requestId);
+    const assignUrl = seniorAssignUrl(requestId);
     const html = `
       <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937;">
         <p><strong>URGENT:</strong> ${escapeHtml(helper.full_name)} can’t attend – ${escapeHtml(patientFirst)}, ${escapeHtml(dateLabel)} ${escapeHtml(timeLabel)}</p>

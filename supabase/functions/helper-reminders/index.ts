@@ -254,10 +254,9 @@ async function processNoConfirmAlerts(
   helpersById: Map<string, HelperRow>,
 ) {
   const seniorEmail = await resolveSecret(supabase, "SENIOR_EMAIL");
-  const accessKey = await resolveSecret(supabase, "SENIOR_ACCESS_KEY");
   const results: Record<string, unknown>[] = [];
 
-  if (!seniorEmail || !accessKey) {
+  if (!seniorEmail) {
     return [{ error: "missing_senior_secrets" }];
   }
 
@@ -271,7 +270,7 @@ async function processNoConfirmAlerts(
     const hoursLeft = (appt - Date.now()) / 3600000;
     const { dateLabel, timeLabel } = appointmentLabels(row);
     const patientFirst = firstName(row.parent_name);
-    const assignUrl = seniorAssignUrl(accessKey, row.id);
+    const assignUrl = seniorAssignUrl(row.id);
     const entry: Record<string, unknown> = {
       request_id: row.id,
       hours_left: Math.round(hoursLeft * 100) / 100,

@@ -82,12 +82,8 @@ Deno.serve(async (req: Request) => {
     }
 
     const seniorEmail = await resolveSecret(supabase, "SENIOR_EMAIL");
-    const accessKey = await resolveSecret(supabase, "SENIOR_ACCESS_KEY");
     if (!seniorEmail) {
       return jsonResponse({ error: "SENIOR_EMAIL missing" }, 500);
-    }
-    if (!accessKey) {
-      return jsonResponse({ error: "SENIOR_ACCESS_KEY missing" }, 500);
     }
 
     const itemsHtml = rows.map((row) => {
@@ -97,7 +93,7 @@ Deno.serve(async (req: Request) => {
         row.appointment_time;
       const area = [row.area, row.pincode].filter(Boolean).join(" · ") ||
         "Area on file";
-      const assignUrl = seniorAssignUrl(accessKey, row.id);
+      const assignUrl = seniorAssignUrl(row.id);
       return `
         <div style="border:1px solid #e5e7eb;border-radius:12px;padding:14px 16px;margin:0 0 14px;">
           <p style="margin:0 0 8px;">

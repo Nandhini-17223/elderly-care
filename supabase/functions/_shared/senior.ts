@@ -4,8 +4,8 @@ import {
   formatAppointmentTime,
 } from "./email.ts";
 
-export const SENIOR_PAGE_BASE =
-  "https://nandhini-17223.github.io/elderly-care/senior.html";
+export const ADMIN_PAGE_BASE =
+  "https://nandhini-17223.github.io/elderly-care/admin";
 
 export const RESPOND_BASE =
   "https://nandhini-17223.github.io/elderly-care/respond.html";
@@ -41,11 +41,10 @@ export function reasonPlain(reason: string | null | undefined): string {
   }
 }
 
-export function seniorAssignUrl(
-  accessKey: string,
-  requestId: string,
-): string {
-  return `${SENIOR_PAGE_BASE}?key=${encodeURIComponent(accessKey)}&request=${encodeURIComponent(requestId)}`;
+/** Portal deep link: login first, then return to the request. */
+export function seniorAssignUrl(requestId: string): string {
+  const next = `needs-action.html?request=${encodeURIComponent(requestId)}`;
+  return `${ADMIN_PAGE_BASE}/login.html?next=${encodeURIComponent(next)}`;
 }
 
 export function assignButtonHtml(url: string, label = "Assign helper"): string {
