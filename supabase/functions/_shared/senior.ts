@@ -32,6 +32,10 @@ export function reasonPlain(reason: string | null | undefined): string {
       return "No suitable helpers available";
     case "all_declined":
       return "All helpers declined";
+    case "helper_dropped":
+      return "Helper dropped out (can’t make it)";
+    case "helper_not_confirmed":
+      return "Helper did not confirm attendance";
     default:
       return reason ? reason.replaceAll("_", " ") : "Needs senior attention";
   }

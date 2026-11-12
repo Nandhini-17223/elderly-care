@@ -169,6 +169,7 @@ async function notifySeniorOfExpiry(
   supabase: SupabaseClient,
   requestId: string,
   helperName: string,
+  expiryMinutes = 60,
 ) {
   const seniorEmail = await resolveSecret(supabase, "SENIOR_EMAIL");
   const accessKey = await resolveSecret(supabase, "SENIOR_ACCESS_KEY");
@@ -187,9 +188,10 @@ async function notifySeniorOfExpiry(
     .maybeSingle();
 
   const assignUrl = seniorAssignUrl(accessKey, requestId);
+  const windowLabel = expiryMinutes === 15 ? "15 minutes" : "1 hour";
   const html = `
     <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937;">
-      <p>No response from <strong>${escapeHtml(helperName)}</strong> within 1 hour – please assign another helper.</p>
+      <p>No response from <strong>${escapeHtml(helperName)}</strong> within ${escapeHtml(windowLabel)} – please assign another helper.</p>
       ${formatRequestSummaryHtml({
         parentName: request.parent_name,
         parentAge: request.parent_age,
@@ -217,13 +219,14 @@ async function notifySeniorOfExpiry(
 async function expireStaleSeniorOffers(
   supabase: SupabaseClient,
 ): Promise<Record<string, unknown>[]> {
-  const cutoff = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  // Fetch open senior offers with appointment timing so urgent (<3h) expire in 15m.
   const { data, error } = await supabase
     .from("helper_offers")
-    .select("id, request_id, helper_id, sent_at, helpers(full_name)")
+    .select(
+      "id, request_id, helper_id, sent_at, helpers(full_name), consultation_requests(appointment_date, appointment_time)",
+    )
     .eq("source", "senior")
-    .eq("status", "sent")
-    .lt("sent_at", cutoff);
+    .eq("status", "sent");
 
   if (error) {
     console.error("expireStaleSeniorOffers query", error);
@@ -231,7 +234,30 @@ async function expireStaleSeniorOffers(
   }
 
   const results: Record<string, unknown>[] = [];
+  const now = Date.now();
+
   for (const row of data ?? []) {
+    const req = (row as {
+      consultation_requests?: {
+        appointment_date?: string;
+        appointment_time?: string;
+      } | null;
+    }).consultation_requests;
+    const sentAt = Date.parse(row.sent_at);
+    if (!Number.isFinite(sentAt) || !req?.appointment_date || !req?.appointment_time) {
+      continue;
+    }
+    const apptMs = Date.parse(
+      `${req.appointment_date}T${String(req.appointment_time).slice(0, 8)}+05:30`,
+    );
+    if (!Number.isFinite(apptMs)) continue;
+
+    const hoursToApptAtSend = (apptMs - sentAt) / 3600000;
+    const expiryMinutes = hoursToApptAtSend < 3 ? 15 : 60;
+    if (now - sentAt < expiryMinutes * 60 * 1000) {
+      continue;
+    }
+
     const { data: expired, error: expireError } = await supabase.rpc(
       "expire_senior_offer",
       { p_offer_id: row.id },
@@ -250,13 +276,19 @@ async function expireStaleSeniorOffers(
         payload.helper_name ||
         (row as { helpers?: { full_name?: string } }).helpers?.full_name ||
         "Helper";
-      await notifySeniorOfExpiry(supabase, payload.request_id, helperName);
+      await notifySeniorOfExpiry(
+        supabase,
+        payload.request_id,
+        helperName,
+        expiryMinutes,
+      );
     }
     results.push({
       offer_id: row.id,
       request_id: row.request_id,
       expired: Boolean(payload?.ok),
       helper_name: payload?.helper_name,
+      expiry_minutes: expiryMinutes,
     });
   }
   return results;

@@ -1,9 +1,14 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import {
+  appointmentConfirmedEmailHtml,
+  createRawToken,
+  guardianHelperAssignedEmailHtml,
+  guardianNewHelperEmailHtml,
+  type RequestContact,
+} from "../_shared/assignment.ts";
+import {
   escapeHtml,
-  formatAppointmentDate,
-  formatAppointmentTime,
   sendEmail,
 } from "../_shared/email.ts";
 import { resolveSecret } from "../_shared/secrets.ts";
@@ -16,27 +21,6 @@ import {
 type RespondPayload = {
   token?: string;
   action?: string;
-};
-
-type RequestDetails = {
-  id: string;
-  parent_name: string;
-  parent_age: number;
-  address_line1: string | null;
-  street: string | null;
-  area: string | null;
-  landmark: string | null;
-  city: string;
-  pincode: string | null;
-  appointment_date: string;
-  appointment_time: string;
-  doctor_hospital: string;
-  booking_person_name: string;
-  relationship: string;
-  email: string;
-  phone_country_code: string;
-  phone: string;
-  assigned_helper_id: string | null;
 };
 
 type HelperDetails = {
@@ -64,75 +48,45 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
-function bytesToHex(bytes: Uint8Array): string {
-  return Array.from(bytes)
+async function sha256Hex(value: string): Promise<string> {
+  const data = new TextEncoder().encode(value);
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(digest))
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
 }
 
-async function sha256Hex(value: string): Promise<string> {
-  const data = new TextEncoder().encode(value);
-  const digest = await crypto.subtle.digest("SHA-256", data);
-  return bytesToHex(new Uint8Array(digest));
-}
-
-function fullAddress(request: RequestDetails): string {
-  return [
-    request.address_line1,
-    request.street,
-    request.area,
-    request.landmark ? `Landmark: ${request.landmark}` : null,
-    request.city,
-    request.pincode,
-  ]
-    .map((part) => (part ? String(part).trim() : ""))
-    .filter(Boolean)
-    .join(", ");
-}
-
 async function sendAcceptanceEmails(
-  request: RequestDetails,
+  supabase: ReturnType<typeof createClient>,
+  request: RequestContact & { id: string; email: string },
   helper: HelperDetails,
-): Promise<{ helper: boolean; guardian: boolean }> {
-  const dateLabel = formatAppointmentDate(request.appointment_date) ??
-    request.appointment_date;
-  const timeLabel = formatAppointmentTime(request.appointment_time) ??
-    request.appointment_time;
-  const address = fullAddress(request);
-  const familyPhone =
-    `${request.phone_country_code} ${request.phone}`.trim();
+  isReplacement: boolean,
+): Promise<{ helper: boolean; guardian: boolean; token_ok: boolean }> {
+  const { token, hash } = await createRawToken();
+  const { data: tokenResult, error: tokenError } = await supabase.rpc(
+    "create_assignment_token",
+    {
+      p_request_id: request.id,
+      p_helper_id: helper.id,
+      p_token_hash: hash,
+    },
+  );
+  if (tokenError) {
+    console.error("create_assignment_token", tokenError);
+  }
+  const tokenOk = Boolean((tokenResult as { ok?: boolean } | null)?.ok);
 
-  const helperHtml = `
-    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937;">
-      <p>Hi ${escapeHtml(helper.full_name)},</p>
-      <p>Your appointment is confirmed.</p>
-      <p>
-        <strong>Patient:</strong> ${escapeHtml(request.parent_name)} (age ${escapeHtml(String(request.parent_age))})<br />
-        <strong>Address:</strong> ${escapeHtml(address)}<br />
-        <strong>Date:</strong> ${escapeHtml(dateLabel)}<br />
-        <strong>Time:</strong> ${escapeHtml(timeLabel)}<br />
-        <strong>Doctor / Hospital:</strong> ${escapeHtml(request.doctor_hospital)}<br />
-        <strong>Family contact:</strong> ${escapeHtml(request.booking_person_name)}
-        (${escapeHtml(request.relationship)}) — ${escapeHtml(familyPhone)}
-      </p>
-      <p>Warm regards,<br />ABI Parent Care</p>
-    </div>
-  `;
-
-  const guardianHtml = `
-    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937;">
-      <p>Hi ${escapeHtml(request.booking_person_name)},</p>
-      <p>A helper has been assigned for your appointment.</p>
-      <p>
-        <strong>Helper:</strong> ${escapeHtml(helper.full_name)}<br />
-        <strong>Helper phone:</strong> ${escapeHtml(helper.phone)}<br />
-        <strong>Date:</strong> ${escapeHtml(dateLabel)}<br />
-        <strong>Time:</strong> ${escapeHtml(timeLabel)}<br />
-        <strong>Hospital:</strong> ${escapeHtml(request.doctor_hospital)}
-      </p>
-      <p>Warm regards,<br />ABI Parent Care</p>
-    </div>
-  `;
+  const helperHtml = appointmentConfirmedEmailHtml(
+    request,
+    helper.full_name,
+    token,
+  );
+  const guardianHtml = isReplacement
+    ? guardianNewHelperEmailHtml(request, helper)
+    : guardianHelperAssignedEmailHtml(request, helper);
+  const guardianSubject = isReplacement
+    ? `Your new helper is ${helper.full_name}`
+    : "A helper has been assigned";
 
   const helperResult = await sendEmail({
     to: helper.email,
@@ -144,11 +98,15 @@ async function sendAcceptanceEmails(
   const guardianResult = await sendEmail({
     to: request.email,
     toName: request.booking_person_name,
-    subject: "A helper has been assigned",
+    subject: guardianSubject,
     html: guardianHtml,
   });
 
-  return { helper: helperResult.ok, guardian: guardianResult.ok };
+  return {
+    helper: helperResult.ok,
+    guardian: guardianResult.ok,
+    token_ok: tokenOk,
+  };
 }
 
 async function triggerNextOffer(requestId: string, waveNumber?: number) {
@@ -174,6 +132,28 @@ async function triggerNextOffer(requestId: string, waveNumber?: number) {
     });
   } catch (error) {
     console.error("Failed to trigger next offer after decline", error);
+  }
+}
+
+async function triggerReminders(requestId: string) {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!supabaseUrl || !serviceRoleKey) return;
+  try {
+    await fetch(`${supabaseUrl}/functions/v1/helper-reminders`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${serviceRoleKey}`,
+        apikey: serviceRoleKey,
+      },
+      body: JSON.stringify({
+        request_id: requestId,
+        reason: "post_accept",
+      }),
+    });
+  } catch (error) {
+    console.error("Failed to trigger helper-reminders after accept", error);
   }
 }
 
@@ -275,6 +255,7 @@ Deno.serve(async (req: Request) => {
         message?: string;
         request_id?: string;
         helper_id?: string;
+        is_replacement?: boolean;
       };
 
       if (result?.ok && result.request_id && result.helper_id) {
@@ -282,7 +263,7 @@ Deno.serve(async (req: Request) => {
           supabase
             .from("consultation_requests")
             .select(
-              "id, parent_name, parent_age, address_line1, street, area, landmark, city, pincode, appointment_date, appointment_time, doctor_hospital, booking_person_name, relationship, email, phone_country_code, phone, assigned_helper_id",
+              "id, parent_name, parent_age, address_line1, street, area, landmark, city, pincode, appointment_date, appointment_time, doctor_hospital, booking_person_name, relationship, email, phone_country_code, phone",
             )
             .eq("id", result.request_id)
             .maybeSingle(),
@@ -295,9 +276,13 @@ Deno.serve(async (req: Request) => {
 
         if (request && helper) {
           await sendAcceptanceEmails(
-            request as RequestDetails,
+            supabase,
+            request as RequestContact & { id: string; email: string },
             helper as HelperDetails,
+            Boolean(result.is_replacement),
           );
+          // Send any reminders that are already due for this assignment
+          await triggerReminders(result.request_id);
         }
       }
 

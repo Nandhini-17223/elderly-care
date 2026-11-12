@@ -124,6 +124,9 @@
     const request = detail.request;
     const helpers = detail.helpers || [];
     const history = detail.offer_history || [];
+    const isAssigned = request.status === "assigned";
+    const canAssign =
+      request.status === "needs_senior" || request.status === "senior_offered";
 
     setStatus(
       request.parent_name,
@@ -139,7 +142,7 @@
       ? history
           .map(function (item) {
             return (
-              '<li><strong>' +
+              "<li><strong>" +
               escapeHtml(item.helper_name) +
               "</strong> — " +
               escapeHtml(item.status) +
@@ -162,17 +165,18 @@
             return '<div class="senior-helper-warning">' + escapeHtml(w) + "</div>";
           })
           .join("");
-        const busyClass = helper.is_busy ? " is-busy" : "";
+        const busyClass = helper.is_busy || helper.dropped_before ? " is-busy" : "";
         const busyNote = helper.busy_label
           ? '<div class="senior-helper-busy">' +
             escapeHtml(helper.busy_label) +
             "</div>"
           : "";
-        const action = helper.selectable
-          ? '<button type="button" class="book-primary-btn senior-offer-btn" data-helper-id="' +
-            escapeHtml(helper.id) +
-            '">Send offer</button>'
-          : "";
+        const action =
+          canAssign && helper.selectable
+            ? '<button type="button" class="book-primary-btn senior-offer-btn" data-helper-id="' +
+              escapeHtml(helper.id) +
+              '">Send offer</button>'
+            : "";
 
         return (
           '<div class="senior-helper-row' +
@@ -205,6 +209,30 @@
         );
       })
       .join("");
+
+    let assignedBlock = "";
+    if (isAssigned && request.assigned_helper) {
+      const confirmed = Boolean(request.helper_confirmed_at);
+      assignedBlock =
+        '<div class="senior-assigned-panel">' +
+        '<h2 class="book-subtitle">Assigned helper</h2>' +
+        "<p><strong>" +
+        escapeHtml(request.assigned_helper.full_name) +
+        "</strong><br />Phone: " +
+        escapeHtml(request.assigned_helper.phone) +
+        "<br />Confirmation: " +
+        (confirmed
+          ? "Confirmed (" + escapeHtml(request.confirmed_by || "unknown") + ")"
+          : "Not confirmed yet") +
+        "</p>" +
+        (confirmed
+          ? ""
+          : '<div class="senior-assigned-actions">' +
+            '<button type="button" class="book-primary-btn" id="senior-confirm-phone-btn">Helper confirmed by phone</button>' +
+            '<button type="button" class="book-secondary-btn" id="senior-unable-reassign-btn">Helper unable – reassign</button>' +
+            "</div>") +
+        "</div>";
+    }
 
     content.hidden = false;
     content.innerHTML =
@@ -240,6 +268,7 @@
       "<strong>Status:</strong> " +
       escapeHtml(request.status) +
       "</p>" +
+      assignedBlock +
       '<h2 class="book-subtitle">Offer history</h2>' +
       '<ul class="senior-history-list">' +
       historyHtml +
@@ -247,7 +276,7 @@
       "</div>" +
       '<div class="senior-detail-block">' +
       '<h2 class="book-subtitle">Active helpers</h2>' +
-      '<p class="book-field-hint">Sorted by best match. Busy helpers cannot be selected.</p>' +
+      '<p class="book-field-hint">Sorted by best match. Busy or previously dropped helpers cannot be selected.</p>' +
       '<div class="senior-helper-list">' +
       (helpersHtml || "<p>No active helpers found.</p>") +
       "</div>" +
@@ -297,6 +326,64 @@
         }
       });
     });
+
+    const confirmPhoneBtn = qs("#senior-confirm-phone-btn");
+    if (confirmPhoneBtn) {
+      confirmPhoneBtn.addEventListener("click", async function () {
+        confirmPhoneBtn.disabled = true;
+        setMessage(qs("#senior-message"), "Saving confirmation…", "success");
+        try {
+          const result = await callSeniorApi({
+            key: key,
+            action: "confirm_by_phone",
+            request_id: request.id,
+          });
+          const payload = result.payload || {};
+          setMessage(
+            qs("#senior-message"),
+            payload.message ||
+              (payload.ok ? "Confirmed." : "Could not confirm."),
+            payload.ok ? "success" : "error"
+          );
+          if (payload.ok) await loadDetail(key, request.id);
+          else confirmPhoneBtn.disabled = false;
+        } catch (_err) {
+          setMessage(qs("#senior-message"), "Network error.", "error");
+          confirmPhoneBtn.disabled = false;
+        }
+      });
+    }
+
+    const unableBtn = qs("#senior-unable-reassign-btn");
+    if (unableBtn) {
+      unableBtn.addEventListener("click", async function () {
+        unableBtn.disabled = true;
+        setMessage(
+          qs("#senior-message"),
+          "Releasing helper and notifying family…",
+          "success"
+        );
+        try {
+          const result = await callSeniorApi({
+            key: key,
+            action: "helper_unable_reassign",
+            request_id: request.id,
+          });
+          const payload = result.payload || {};
+          setMessage(
+            qs("#senior-message"),
+            payload.message ||
+              (payload.ok ? "Helper released." : "Could not reassign."),
+            payload.ok ? "success" : "error"
+          );
+          if (payload.ok) await loadDetail(key, request.id);
+          else unableBtn.disabled = false;
+        } catch (_err) {
+          setMessage(qs("#senior-message"), "Network error.", "error");
+          unableBtn.disabled = false;
+        }
+      });
+    }
   }
 
   async function loadList(key) {

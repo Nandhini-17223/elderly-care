@@ -5165,6 +5165,40 @@ button, input, select, textarea {
   white-space: nowrap;
 }
 
+.senior-assigned-panel {
+  margin: 18px 0 8px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(45, 125, 246, 0.22);
+  background: rgba(239, 246, 255, 0.7);
+}
+
+.senior-assigned-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.senior-assigned-actions .book-primary-btn,
+.senior-assigned-actions .book-secondary-btn {
+  height: 42px;
+  padding: 0 16px;
+  font-size: 13.5px;
+}
+
+.book-secondary-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid rgba(22, 59, 122, 0.22);
+  background: #fff;
+  color: var(--book-navy, #163b7a);
+  font-weight: 700;
+  cursor: pointer;
+}
+
 @media (max-width: 720px) {
   .senior-helper-row {
     flex-direction: column;
