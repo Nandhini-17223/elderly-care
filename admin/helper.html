@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Helper | ABI Staff Portal</title>
+    <meta name="robots" content="noindex, nofollow" />
+    <link rel="icon" href="../assets/img/logo.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="../assets/css/styles.css" />
+    <link rel="stylesheet" href="../assets/css/admin.css" />
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script defer src="../assets/js/admin/config.js"></script>
+    <script defer src="../assets/js/admin/auth.js"></script>
+    <script defer src="../assets/js/admin/api.js"></script>
+    <script defer src="../assets/js/admin/helper-detail.js"></script>
+  </head>
+  <body class="admin-page">
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="topbar">
+      <div class="container">
+        <nav class="nav" aria-label="Primary">
+          <a class="brand" href="index.html" aria-label="Staff portal home">
+            <svg class="brand-icon" viewBox="0 0 48 48" aria-hidden="true">
+              <path fill="#1d6fd8" d="M24 42l-2.5-2.2C11 32.8 6 28.5 6 22c0-5 4-9 9-9 2.2 0 4.2.9 5.6 2.3 1.4-1.4 3.4-2.3 5.6-2.3 5 0 9 4 9 9 0 6.5-5 10.8-15.5 17.8L24 42z"/>
+              <path stroke="#4a9cf7" stroke-width="2" stroke-linecap="round" fill="none" d="M24 20v16M18 28h12"/>
+            </svg>
+            <span class="brand-text"><strong>ABI</strong><br /><span>PARENT CARE</span></span>
+          </a>
+          <div class="admin-nav" data-admin-nav></div>
+        </nav>
+        <div class="admin-userbar">
+          <span data-admin-user></span>
+          <button type="button" class="book-secondary-btn" data-admin-logout>Log out</button>
+        </div>
+      </div>
+    </header>
+    <main id="main" class="admin-shell">
+      <div class="container">
+        <div class="admin-card">
+          <p class="admin-muted"><a href="helpers.html">← Helpers</a></p>
+          <h1 id="helper-title">Add helper</h1>
+          <p class="book-field-hint" id="helper-subtitle">Profile details · Asia/Kolkata</p>
+          <div class="book-form-message" id="helper-message" role="status" aria-live="polite" hidden></div>
+
+          <form id="helper-form" class="admin-form-grid">
+            <label>Full name
+              <input id="full_name" name="full_name" type="text" required maxlength="120" />
+            </label>
+            <label>Gender
+              <select id="gender" name="gender" required>
+                <option value="female">Female</option>
+                <option value="male">Male</option>
+              </select>
+            </label>
+            <label>Email
+              <input id="email" name="email" type="email" required />
+            </label>
+            <label>Phone
+              <input id="phone" name="phone" type="text" required maxlength="40" />
+            </label>
+            <label>Home area
+              <input id="home_area" name="home_area" type="text" required maxlength="120" />
+            </label>
+            <label>Home pincode
+              <input id="home_pincode" name="home_pincode" type="text" required pattern="\d{6}" maxlength="6" inputmode="numeric" />
+            </label>
+            <label>Max travel (km)
+              <input id="max_travel_km" name="max_travel_km" type="number" min="1" max="200" value="10" required />
+            </label>
+            <label>Languages
+              <input id="languages" name="languages" type="text" maxlength="200" placeholder="Tamil, English" />
+            </label>
+            <label class="admin-check-label">
+              <input id="can_drive" name="can_drive" type="checkbox" />
+              Can drive
+            </label>
+            <label style="grid-column:1/-1">Notes
+              <textarea id="notes" name="notes" rows="3" maxlength="2000"></textarea>
+            </label>
+            <div class="admin-actions-row" style="grid-column:1/-1">
+              <button class="book-primary-btn" type="submit" id="save-helper-btn">Save helper</button>
+            </div>
+          </form>
+
+          <div id="verification-panel" hidden>
+            <h2 class="admin-section-title">Verification checklist</h2>
+            <p class="book-field-hint" id="verification-progress">0 of 4 required checks done</p>
+            <p class="admin-muted" id="verification-status-line"></p>
+
+            <section class="admin-verify-block" id="check-aadhaar">
+              <h3>1. Aadhaar (mandatory)</h3>
+              <p class="book-field-hint">Verify via QR scan in the mAadhaar app. Store last 4 digits only — never a full number or image.</p>
+              <label class="admin-check-label">
+                <input id="aadhaar_qr_verified" type="checkbox" />
+                Verified via QR scan in mAadhaar app
+              </label>
+              <label>Aadhaar last 4 digits
+                <input id="aadhaar_last4" type="text" inputmode="numeric" maxlength="4" pattern="\d{4}" autocomplete="off" />
+              </label>
+              <button type="button" class="book-secondary-btn" data-action="save_aadhaar">Save Aadhaar check</button>
+              <p class="admin-muted" id="aadhaar-meta"></p>
+            </section>
+
+            <section class="admin-verify-block" id="check-second-id">
+              <h3>2. Additional ID proof (mandatory)</h3>
+              <label>ID type
+                <select id="second_id_type">
+                  <option value="pan">PAN</option>
+                  <option value="voter_id">Voter ID</option>
+                  <option value="passport">Passport</option>
+                  <option value="driving_licence">Driving licence</option>
+                </select>
+              </label>
+              <label>Last 4 digits
+                <input id="second_id_last4" type="text" inputmode="numeric" maxlength="4" pattern="\d{4}" autocomplete="off" />
+              </label>
+              <div id="dl-fields" hidden>
+                <label>DL last 4
+                  <input id="dl_last4" type="text" inputmode="numeric" maxlength="4" pattern="\d{4}" autocomplete="off" />
+                </label>
+                <label>DL expiry
+                  <input id="dl_expiry" type="date" />
+                </label>
+              </div>
+              <p class="book-field-hint" id="dl-driver-hint" hidden>Drivers must use a Driving licence with a future expiry date.</p>
+              <button type="button" class="book-secondary-btn" data-action="save_second_id">Save ID proof</button>
+            </section>
+
+            <section class="admin-verify-block" id="check-bg">
+              <h3>3. Background verification (mandatory)</h3>
+              <label>Method
+                <select id="bg_check_method">
+                  <option value="police_certificate">Police certificate</option>
+                  <option value="vendor">Verification company</option>
+                  <option value="in_house">In-house check</option>
+                </select>
+              </label>
+              <label>Reference number
+                <input id="bg_check_reference" type="text" maxlength="120" />
+              </label>
+              <label>Date
+                <input id="bg_check_date" type="date" />
+              </label>
+              <label>Notes
+                <textarea id="bg_check_notes" rows="2" maxlength="2000" placeholder="Address visited, 2 references called"></textarea>
+              </label>
+              <button type="button" class="book-secondary-btn" data-action="save_bg_check">Save background check</button>
+            </section>
+
+            <section class="admin-verify-block" id="check-photo">
+              <h3>4. Photo (mandatory)</h3>
+              <p class="book-field-hint">JPG/PNG, max 5 MB. Stored in private helper-photos bucket.</p>
+              <input id="photo_file" type="file" accept="image/jpeg,image/png" />
+              <div class="admin-actions-row">
+                <button type="button" class="book-secondary-btn" data-action="upload_photo">Upload photo</button>
+                <button type="button" class="book-secondary-btn" data-action="approve_photo">Approve</button>
+                <button type="button" class="book-secondary-btn" data-action="reject_photo">Reject</button>
+              </div>
+              <p class="admin-muted" id="photo-status-line"></p>
+              <img id="photo-preview" alt="Helper photo preview" hidden style="max-width:220px;border-radius:12px;margin-top:8px" />
+            </section>
+
+            <section class="admin-verify-block" id="check-references">
+              <h3>5. References (optional)</h3>
+              <label class="admin-check-label">
+                <input id="references_checked" type="checkbox" />
+                References checked
+              </label>
+              <label>Notes
+                <textarea id="references_notes" rows="2" maxlength="2000"></textarea>
+              </label>
+              <button type="button" class="book-secondary-btn" data-action="save_references">Save references</button>
+            </section>
+
+            <div class="admin-actions-row" style="margin-top:20px">
+              <button type="button" class="book-primary-btn" id="mark-verified-btn" disabled>Mark as Verified</button>
+              <button type="button" class="book-secondary-btn" id="reject-helper-btn">Reject</button>
+              <button type="button" class="book-secondary-btn" id="toggle-active-btn">Deactivate</button>
+            </div>
+
+            <h2 class="admin-section-title">Helper login</h2>
+            <p class="book-field-hint" id="login-status-line">No login yet. Available after verification.</p>
+            <div class="admin-form-grid" id="login-create-form">
+              <label>Temporary password
+                <input id="login_password" type="text" minlength="8" autocomplete="off" />
+              </label>
+              <div style="align-self:end">
+                <button type="button" class="book-primary-btn" id="create-login-btn">Create login</button>
+              </div>
+            </div>
+            <div class="admin-actions-row">
+              <button type="button" class="book-secondary-btn" id="toggle-login-btn" hidden>Disable login</button>
+            </div>
+
+            <h2 class="admin-section-title">Upcoming assigned jobs</h2>
+            <ul id="upcoming-jobs" class="senior-history-list"><li class="admin-muted">None</li></ul>
+          </div>
+        </div>
+      </div>
+    </main>
+  </body>
+</html>

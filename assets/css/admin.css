@@ -141,11 +141,52 @@
 .admin-filters input,
 .admin-filters select,
 .admin-login-form input,
-.admin-form-grid input {
+.admin-form-grid input,
+.admin-form-grid select,
+.admin-form-grid textarea,
+.admin-verify-block input,
+.admin-verify-block select,
+.admin-verify-block textarea {
   border: 1px solid rgba(22, 59, 122, 0.18);
   border-radius: 10px;
   padding: 10px 12px;
   background: #fff;
+}
+
+.admin-verify-block {
+  margin: 16px 0;
+  padding: 16px 0;
+  border-top: 1px solid rgba(22, 59, 122, 0.08);
+  display: grid;
+  gap: 10px;
+}
+
+.admin-verify-block h3 {
+  margin: 0;
+  color: var(--navy);
+  font-size: 1rem;
+}
+
+.admin-check-label {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--navy);
+}
+
+.admin-check-label input {
+  width: auto;
+  padding: 0;
+}
+
+.senior-helper-row.is-unverified {
+  opacity: 0.55;
+}
+
+.senior-helper-row.is-unverified .senior-helper-warning {
+  color: #9a3412;
 }
 
 .admin-login-wrap {

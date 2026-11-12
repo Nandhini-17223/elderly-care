@@ -560,7 +560,7 @@ Deno.serve(async (req: Request) => {
       if (search) {
         const like = `%${search}%`;
         query = query.or(
-          `full_name.ilike.${JSON.stringify(like)},phone.ilike.${JSON.stringify(like)},home_area.ilike.${JSON.stringify(like)}`,
+          `full_name.ilike.${like},phone.ilike.${like},home_area.ilike.${like}`,
         );
       }
       const verification = String(payload.verification_status ?? "").trim();
@@ -697,6 +697,8 @@ Deno.serve(async (req: Request) => {
 
       return jsonResponse({
         ok: true,
+        helper_id: created.id,
+        message: "Helper created.",
         helper: {
           ...created,
           verification_progress: verificationProgress(created as HelperRow),

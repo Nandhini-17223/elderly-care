@@ -129,9 +129,16 @@
             return '<div class="senior-helper-warning">' + esc(w) + "</div>";
           })
           .join("");
-        const busyClass = helper.is_busy || helper.dropped_before ? " is-busy" : "";
+        const unverified = helper.is_verified === false ||
+          (helper.verification_status && helper.verification_status !== "verified");
+        const busyClass =
+          (helper.is_busy || helper.dropped_before ? " is-busy" : "") +
+          (unverified ? " is-unverified" : "");
         const busyNote = helper.busy_label
           ? '<div class="senior-helper-busy">' + esc(helper.busy_label) + "</div>"
+          : "";
+        const unverifiedNote = unverified
+          ? '<div class="senior-helper-warning">Not verified</div>'
           : "";
         const action =
           canAssign && helper.selectable
@@ -156,6 +163,7 @@
           " upcoming job" +
           (helper.upcoming_assigned_jobs === 1 ? "" : "s") +
           "</div>" +
+          unverifiedNote +
           warnings +
           busyNote +
           '</div><div class="senior-helper-actions">' +

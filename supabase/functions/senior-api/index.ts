@@ -79,6 +79,8 @@ type HelperCandidate = {
   is_busy: boolean;
   busy_at: string | null;
   upcoming_assigned_jobs: number;
+  verification_status?: string;
+  is_verified?: boolean;
 };
 
 type OfferHistoryRow = {
@@ -301,6 +303,9 @@ async function getRequestDetail(
   const helpers = ((helpersRaw ?? []) as HelperCandidate[]).map((helper) => {
     const busyLabel = formatBusyAt(helper.busy_at);
     const dropped = Boolean(helper.dropped_before);
+    const verified = helper.is_verified !== false &&
+      (helper.verification_status == null ||
+        helper.verification_status === "verified");
     return {
       id: helper.helper_id,
       full_name: helper.full_name,
@@ -318,8 +323,10 @@ async function getRequestDetail(
       busy_at: helper.busy_at,
       busy_label: busyLabel ? `Busy at ${busyLabel}` : null,
       upcoming_assigned_jobs: Number(helper.upcoming_assigned_jobs) || 0,
+      verification_status: helper.verification_status ?? null,
+      is_verified: verified,
       warnings: buildWarnings(helper, req.helper_preference),
-      selectable: !helper.is_busy && !dropped,
+      selectable: verified && !helper.is_busy && !dropped,
     };
   });
 
@@ -489,10 +496,17 @@ async function sendSeniorOffer(
     return { ok: false, code: "helper_not_found", message: "Helper not found." };
   }
   if (!helper.selectable) {
+    const code = !helper.is_verified
+      ? "helper_not_verified"
+      : helper.dropped_before
+      ? "helper_dropped_before"
+      : "helper_busy";
     return {
       ok: false,
-      code: helper.dropped_before ? "helper_dropped_before" : "helper_busy",
-      message: helper.dropped_before
+      code,
+      message: !helper.is_verified
+        ? "Not verified"
+        : helper.dropped_before
         ? "This helper previously dropped out of this request."
         : helper.busy_label || "Helper is busy at this time.",
     };

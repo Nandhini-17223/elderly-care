@@ -28,7 +28,33 @@ type HelperDetails = {
   full_name: string;
   email: string;
   phone: string;
+  photo_path?: string | null;
+  photo_status?: string | null;
+  photo_url?: string | null;
 };
+
+async function helperPhotoSignedUrl(
+  supabase: ReturnType<typeof createClient>,
+  helper: HelperDetails,
+  appointmentDate: string,
+): Promise<string | null> {
+  if (helper.photo_status !== "approved" || !helper.photo_path) return null;
+  const dayAfter = new Date(`${appointmentDate}T23:59:59+05:30`);
+  if (Number.isNaN(dayAfter.getTime())) return null;
+  dayAfter.setDate(dayAfter.getDate() + 1);
+  const expiresIn = Math.max(
+    60,
+    Math.floor((dayAfter.getTime() - Date.now()) / 1000),
+  );
+  const { data, error } = await supabase.storage
+    .from("helper-photos")
+    .createSignedUrl(helper.photo_path, expiresIn);
+  if (error) {
+    console.error("helper photo signed url", error);
+    return null;
+  }
+  return data?.signedUrl ?? null;
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -76,14 +102,21 @@ async function sendAcceptanceEmails(
   }
   const tokenOk = Boolean((tokenResult as { ok?: boolean } | null)?.ok);
 
+  const photoUrl = await helperPhotoSignedUrl(
+    supabase,
+    helper,
+    request.appointment_date,
+  );
+  const helperForGuardian = { ...helper, photo_url: photoUrl };
+
   const helperHtml = appointmentConfirmedEmailHtml(
     request,
     helper.full_name,
     token,
   );
   const guardianHtml = isReplacement
-    ? guardianNewHelperEmailHtml(request, helper)
-    : guardianHelperAssignedEmailHtml(request, helper);
+    ? guardianNewHelperEmailHtml(request, helperForGuardian)
+    : guardianHelperAssignedEmailHtml(request, helperForGuardian);
   const guardianSubject = isReplacement
     ? `Your new helper is ${helper.full_name}`
     : "A helper has been assigned";
@@ -268,7 +301,7 @@ Deno.serve(async (req: Request) => {
             .maybeSingle(),
           supabase
             .from("helpers")
-            .select("id, full_name, email, phone")
+            .select("id, full_name, email, phone, photo_path, photo_status")
             .eq("id", result.helper_id)
             .maybeSingle(),
         ]);
