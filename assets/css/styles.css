@@ -5036,3 +5036,143 @@ button, input, select, textarea {
     justify-content: flex-start;
   }
 }
+
+/* Senior assignment page */
+.senior-card {
+  max-width: 920px;
+  margin: 0 auto;
+}
+
+.senior-card h1 {
+  margin: 0 0 8px;
+  font-size: 28px;
+  font-weight: 900;
+  color: var(--book-navy, #163b7a);
+}
+
+.senior-back {
+  margin: 0 0 16px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.senior-back a {
+  color: var(--book-accent, #2d7df6);
+}
+
+.senior-request-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.senior-request-row {
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(45, 125, 246, 0.18);
+  background: rgba(255, 255, 255, 0.88);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.senior-request-row:hover {
+  border-color: rgba(45, 125, 246, 0.45);
+  box-shadow: 0 10px 24px rgba(29, 111, 216, 0.12);
+}
+
+.senior-request-main {
+  color: var(--book-navy, #163b7a);
+  font-size: 15px;
+}
+
+.senior-request-meta,
+.senior-request-reason,
+.senior-helper-meta {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(22, 59, 122, 0.62);
+}
+
+.senior-detail-grid {
+  display: grid;
+  gap: 22px;
+  margin-top: 8px;
+}
+
+.senior-detail-block p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: rgba(22, 59, 122, 0.92);
+}
+
+.senior-history-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13.5px;
+  color: rgba(22, 59, 122, 0.82);
+}
+
+.senior-helper-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.senior-helper-row {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.senior-helper-row.is-busy {
+  opacity: 0.55;
+  background: rgba(226, 232, 240, 0.55);
+}
+
+.senior-helper-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.senior-helper-info strong {
+  color: var(--book-navy, #163b7a);
+  font-size: 15px;
+}
+
+.senior-helper-warning,
+.senior-helper-busy {
+  margin-top: 4px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #9a3412;
+}
+
+.senior-helper-busy {
+  color: #475569;
+}
+
+.senior-helper-actions .book-primary-btn {
+  height: 42px;
+  padding: 0 16px;
+  font-size: 13.5px;
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .senior-helper-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .senior-helper-actions .book-primary-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
