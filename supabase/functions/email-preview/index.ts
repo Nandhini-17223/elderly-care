@@ -2,12 +2,15 @@
  * One-off preview batch: sends every approved template (G1–G5, H1–H5, M1–M9)
  * to TEST_EMAIL_TO with subject prefix "[PREVIEW G1]", etc.
  *
- * Run again (service role always; anon key only while EMAIL_TEST_MODE=true):
+ * Run again (service role, or project anon / publishable key):
  *   curl -X POST "$SUPABASE_URL/functions/v1/email-preview" \
- *     -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
- *     -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+ *     -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+ *     -H "apikey: $SUPABASE_ANON_KEY" \
  *     -H "Content-Type: application/json" \
  *     -d '{"confirm":"send-all-previews"}'
+ *
+ * Emails always go to TEST_EMAIL_TO; subjects are prefixed [PREVIEW G1], etc.
+ * Optional subset: {"confirm":"send-all-previews","only":["G1","H1"]}
  *
  * Optional: pass {"confirm":"send-all-previews","only":["G1","H1"]} to send a subset.
  */
