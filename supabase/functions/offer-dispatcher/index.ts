@@ -6,6 +6,12 @@ import {
   formatAppointmentTime,
   sendEmail,
 } from "../_shared/email.ts";
+import { resolveSecret } from "../_shared/secrets.ts";
+import {
+  assignButtonHtml,
+  formatRequestSummaryHtml,
+  seniorAssignUrl,
+} from "../_shared/senior.ts";
 
 const RESPOND_BASE =
   "https://nandhini-17223.github.io/elderly-care/respond.html";
@@ -157,6 +163,103 @@ async function markNeedsSenior(
   if (error) {
     console.error("mark_request_needs_senior failed", requestId, error);
   }
+}
+
+async function notifySeniorOfExpiry(
+  supabase: SupabaseClient,
+  requestId: string,
+  helperName: string,
+) {
+  const seniorEmail = await resolveSecret(supabase, "SENIOR_EMAIL");
+  const accessKey = await resolveSecret(supabase, "SENIOR_ACCESS_KEY");
+  if (!seniorEmail || !accessKey) {
+    console.error("Missing SENIOR_EMAIL or SENIOR_ACCESS_KEY for expiry alert");
+    return;
+  }
+
+  const request = await loadRequest(supabase, requestId);
+  if (!request) return;
+
+  const { data: full } = await supabase
+    .from("consultation_requests")
+    .select("needs_senior_reason, doctor_hospital, helper_preference")
+    .eq("id", requestId)
+    .maybeSingle();
+
+  const assignUrl = seniorAssignUrl(accessKey, requestId);
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937;">
+      <p>No response from <strong>${escapeHtml(helperName)}</strong> within 1 hour – please assign another helper.</p>
+      ${formatRequestSummaryHtml({
+        parentName: request.parent_name,
+        parentAge: request.parent_age,
+        appointmentDate: request.appointment_date,
+        appointmentTime: request.appointment_time,
+        area: request.area,
+        pincode: request.pincode,
+        doctorHospital: full?.doctor_hospital ?? request.doctor_hospital,
+        helperPreference: full?.helper_preference ?? request.helper_preference,
+        reason: full?.needs_senior_reason ?? null,
+      })}
+      <p style="margin: 24px 0;">${assignButtonHtml(assignUrl)}</p>
+      <p>Warm regards,<br />ABI Parent Care</p>
+    </div>
+  `;
+
+  await sendEmail({
+    to: seniorEmail,
+    toName: "Senior coordinator",
+    subject: `${helperName} did not respond – please assign another`,
+    html,
+  });
+}
+
+async function expireStaleSeniorOffers(
+  supabase: SupabaseClient,
+): Promise<Record<string, unknown>[]> {
+  const cutoff = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  const { data, error } = await supabase
+    .from("helper_offers")
+    .select("id, request_id, helper_id, sent_at, helpers(full_name)")
+    .eq("source", "senior")
+    .eq("status", "sent")
+    .lt("sent_at", cutoff);
+
+  if (error) {
+    console.error("expireStaleSeniorOffers query", error);
+    return [{ error: error.message }];
+  }
+
+  const results: Record<string, unknown>[] = [];
+  for (const row of data ?? []) {
+    const { data: expired, error: expireError } = await supabase.rpc(
+      "expire_senior_offer",
+      { p_offer_id: row.id },
+    );
+    if (expireError) {
+      results.push({ offer_id: row.id, ok: false, error: expireError.message });
+      continue;
+    }
+    const payload = expired as {
+      ok?: boolean;
+      request_id?: string;
+      helper_name?: string;
+    };
+    if (payload?.ok && payload.request_id) {
+      const helperName =
+        payload.helper_name ||
+        (row as { helpers?: { full_name?: string } }).helpers?.full_name ||
+        "Helper";
+      await notifySeniorOfExpiry(supabase, payload.request_id, helperName);
+    }
+    results.push({
+      offer_id: row.id,
+      request_id: row.request_id,
+      expired: Boolean(payload?.ok),
+      helper_name: payload?.helper_name,
+    });
+  }
+  return results;
 }
 
 async function loadRequest(
@@ -442,6 +545,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const results: Record<string, unknown>[] = [];
+    const seniorExpiry = await expireStaleSeniorOffers(supabase);
 
     if (payload.request_id) {
       const request = await loadRequest(supabase, payload.request_id);
@@ -482,6 +586,7 @@ Deno.serve(async (req: Request) => {
       ok: true,
       reason: payload.reason ?? "manual",
       results,
+      senior_expiry: seniorExpiry,
     });
   } catch (error) {
     console.error(error);

@@ -6,6 +6,12 @@ import {
   formatAppointmentTime,
   sendEmail,
 } from "../_shared/email.ts";
+import { resolveSecret } from "../_shared/secrets.ts";
+import {
+  assignButtonHtml,
+  formatRequestSummaryHtml,
+  seniorAssignUrl,
+} from "../_shared/senior.ts";
 
 type RespondPayload = {
   token?: string;
@@ -171,6 +177,56 @@ async function triggerNextOffer(requestId: string, waveNumber?: number) {
   }
 }
 
+async function notifySeniorOfDecline(
+  supabase: ReturnType<typeof createClient>,
+  requestId: string,
+  helperName: string,
+) {
+  const seniorEmail = await resolveSecret(supabase, "SENIOR_EMAIL");
+  const accessKey = await resolveSecret(supabase, "SENIOR_ACCESS_KEY");
+  if (!seniorEmail || !accessKey) {
+    console.error("Missing SENIOR_EMAIL or SENIOR_ACCESS_KEY for decline alert");
+    return;
+  }
+
+  const { data: request } = await supabase
+    .from("consultation_requests")
+    .select(
+      "id, parent_name, parent_age, area, pincode, appointment_date, appointment_time, doctor_hospital, helper_preference, needs_senior_reason",
+    )
+    .eq("id", requestId)
+    .maybeSingle();
+
+  if (!request) return;
+
+  const assignUrl = seniorAssignUrl(accessKey, requestId);
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937;">
+      <p><strong>${escapeHtml(helperName)}</strong> declined – please assign another helper.</p>
+      ${formatRequestSummaryHtml({
+        parentName: request.parent_name,
+        parentAge: request.parent_age,
+        appointmentDate: request.appointment_date,
+        appointmentTime: request.appointment_time,
+        area: request.area,
+        pincode: request.pincode,
+        doctorHospital: request.doctor_hospital,
+        helperPreference: request.helper_preference,
+        reason: request.needs_senior_reason,
+      })}
+      <p style="margin: 24px 0;">${assignButtonHtml(assignUrl)}</p>
+      <p>Warm regards,<br />ABI Parent Care</p>
+    </div>
+  `;
+
+  await sendEmail({
+    to: seniorEmail,
+    toName: "Senior coordinator",
+    subject: `${helperName} declined – please assign another`,
+    html,
+  });
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders });
@@ -270,10 +326,25 @@ Deno.serve(async (req: Request) => {
       request_id?: string;
       wave_number?: number;
       request_status?: string;
+      source?: string;
+      helper_name?: string;
     };
 
     if (result?.ok && result.request_id && result.request_status === "offered") {
       await triggerNextOffer(result.request_id, result.wave_number);
+    }
+
+    if (
+      result?.ok &&
+      result.request_id &&
+      result.source === "senior" &&
+      result.request_status === "needs_senior"
+    ) {
+      await notifySeniorOfDecline(
+        supabase,
+        result.request_id,
+        result.helper_name || "Helper",
+      );
     }
 
     return jsonResponse({
