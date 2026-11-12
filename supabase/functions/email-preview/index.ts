@@ -353,10 +353,11 @@ Deno.serve(async (req: Request) => {
     const authHeader = req.headers.get("Authorization") || "";
     const bearer = authHeader.replace(/^Bearer\s+/i, "").trim();
     const testMode = Deno.env.get("EMAIL_TEST_MODE") === "true";
-    // Allow service role always; allow anon only while EMAIL_TEST_MODE is on
-    // (emails still redirect to TEST_EMAIL_TO).
+    // Allow service role always; allow anon for this preview-only function
+    // (batch always sends to TEST_EMAIL_TO, never to sample recipient addresses).
     const authorized = Boolean(
       (serviceRoleKey && bearer === serviceRoleKey) ||
+        (anonKey && bearer === anonKey) ||
         (testMode && anonKey && bearer === anonKey),
     );
     if (!authorized) {
