@@ -13,7 +13,7 @@ import {
   reminderStatusLabel,
   seniorAssignUrl,
 } from "../_shared/senior.ts";
-import { templateM6, templateM7 } from "../_shared/templates.ts";
+import { templateM6, templateM7 } from "../_shared/templates-m.ts";
 
 type AssignedRow = {
   id: string;

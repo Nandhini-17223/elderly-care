@@ -21,8 +21,8 @@ import {
 import {
   ON_SCREEN,
   fillOnScreen,
-  templateM3,
-} from "../_shared/templates.ts";
+} from "../_shared/templates-common.ts";
+import { templateM3 } from "../_shared/templates-m.ts";
 
 type RespondPayload = {
   token?: string;

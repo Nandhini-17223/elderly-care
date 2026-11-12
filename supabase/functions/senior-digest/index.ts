@@ -7,7 +7,7 @@ import {
   needsActionUrl,
   seniorAssignUrl,
 } from "../_shared/senior.ts";
-import { templateM2 } from "../_shared/templates.ts";
+import { templateM2 } from "../_shared/templates-m.ts";
 
 type RequestRow = {
   id: string;

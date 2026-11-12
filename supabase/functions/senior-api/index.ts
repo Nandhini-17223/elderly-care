@@ -18,7 +18,8 @@ import {
   reasonPlain,
   seniorAssignUrl,
 } from "../_shared/senior.ts";
-import { templateH1, templateM5 } from "../_shared/templates.ts";
+import { templateH1 } from "../_shared/templates-h.ts";
+import { templateM5 } from "../_shared/templates-m.ts";
 import { requireStaff, writeAudit } from "../_shared/staff-auth.ts";
 
 type ApiPayload = {

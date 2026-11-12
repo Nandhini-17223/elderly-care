@@ -13,6 +13,7 @@ import {
   formatRequestSummaryHtml,
   seniorAssignUrl,
 } from "../_shared/senior.ts";
+import { templateM5, templateM8 } from "../_shared/templates-m.ts";
 
 type HelperRow = {
   id: string;

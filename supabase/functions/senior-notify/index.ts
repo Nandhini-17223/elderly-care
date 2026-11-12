@@ -7,7 +7,8 @@ import {
   MANAGER_FIRST_NAME,
   seniorAssignUrl,
 } from "../_shared/senior.ts";
-import { templateG2, templateM1 } from "../_shared/templates.ts";
+import { templateG2 } from "../_shared/templates-g.ts";
+import { templateM1 } from "../_shared/templates-m.ts";
 
 type NotifyPayload = {
   request_id?: string;

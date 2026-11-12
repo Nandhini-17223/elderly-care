@@ -3,15 +3,17 @@ import {
   formatAppointmentTime,
 } from "./email.ts";
 import { RESPOND_BASE, firstName } from "./senior.ts";
+import type { EmailContent } from "./templates-common.ts";
 import {
   templateG3,
   templateG4,
   templateG5,
+} from "./templates-g.ts";
+import {
   templateH2,
   templateH3,
   templateH4,
-  type EmailContent,
-} from "./templates.ts";
+} from "./templates-h.ts";
 
 export type RequestContact = {
   parent_name: string;

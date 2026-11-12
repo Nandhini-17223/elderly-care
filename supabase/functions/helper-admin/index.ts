@@ -10,7 +10,8 @@ import {
   firstName,
   seniorAssignUrl,
 } from "../_shared/senior.ts";
-import { templateH5, templateM5 } from "../_shared/templates.ts";
+import { templateH5 } from "../_shared/templates-h.ts";
+import { templateM5 } from "../_shared/templates-m.ts";
 import {
   requireStaff,
   writeAudit,

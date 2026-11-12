@@ -9,7 +9,8 @@ import {
   seniorAssignUrl,
 } from "../_shared/senior.ts";
 import { loadAppSettings, settingInt } from "../_shared/staff-auth.ts";
-import { templateH1, templateM4 } from "../_shared/templates.ts";
+import { templateH1 } from "../_shared/templates-h.ts";
+import { templateM4 } from "../_shared/templates-m.ts";
 
 type DispatcherPayload = {
   request_id?: string;

@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { sendEmail } from "../_shared/email.ts";
-import { templateG1 } from "../_shared/templates.ts";
+import { templateG1 } from "../_shared/templates-g.ts";
 
 type ConsultationRecord = {
   id: string;

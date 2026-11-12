@@ -7,7 +7,7 @@ import {
   firstName,
   preferenceLabel,
   reasonPlain,
-} from "./templates.ts";
+} from "./templates-common.ts";
 
 export const ADMIN_PAGE_BASE =
   "https://nandhini-17223.github.io/elderly-care/admin";

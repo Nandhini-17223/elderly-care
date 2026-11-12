@@ -11,10 +11,8 @@ import {
   firstName,
   seniorAssignUrl,
 } from "../_shared/senior.ts";
-import {
-  ON_SCREEN,
-  templateM5,
-} from "../_shared/templates.ts";
+import { ON_SCREEN } from "../_shared/templates-common.ts";
+import { templateM5 } from "../_shared/templates-m.ts";
 
 type ActionPayload = {
   token?: string;
