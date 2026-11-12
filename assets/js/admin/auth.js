@@ -119,6 +119,7 @@
         { href: "index.html", label: "Dashboard" },
         { href: "needs-action.html", label: "Needs action" },
         { href: "requests.html", label: "All requests" },
+        { href: "helpers.html", label: "Helpers" },
       ];
       if (profile.role === "super_admin") {
         links.push(

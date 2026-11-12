@@ -36,6 +36,8 @@ export function reasonPlain(reason: string | null | undefined): string {
       return "Helper dropped out (can’t make it)";
     case "helper_not_confirmed":
       return "Helper did not confirm attendance";
+    case "helper_unavailable":
+      return "Helper unavailable (deactivated, rejected, or DL expired)";
     default:
       return reason ? reason.replaceAll("_", " ") : "Needs senior attention";
   }

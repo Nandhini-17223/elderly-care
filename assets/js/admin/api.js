@@ -47,6 +47,29 @@
     return { response: response, payload: payload };
   }
 
+  async function callHelperAdmin(body) {
+    const token = await global.AdminAuth.accessToken();
+    if (!token) {
+      return {
+        response: { status: 401 },
+        payload: { ok: false, error: "Unauthorized" },
+      };
+    }
+    const response = await fetch(cfg.FUNCTIONS_BASE + "/helper-admin", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: cfg.SUPABASE_ANON_KEY,
+        Authorization: "Bearer " + token,
+      },
+      body: JSON.stringify(body),
+    });
+    const payload = await response.json().catch(function () {
+      return {};
+    });
+    return { response: response, payload: payload };
+  }
+
   function formatIstDate(isoOrDate) {
     if (!isoOrDate) return "—";
     const d = isoOrDate instanceof Date ? isoOrDate : new Date(isoOrDate);
@@ -136,6 +159,7 @@
   global.AdminApi = {
     callStaffApi: callStaffApi,
     callStaffAccounts: callStaffAccounts,
+    callHelperAdmin: callHelperAdmin,
     formatIstDate: formatIstDate,
     formatIstTime: formatIstTime,
     formatIstDateTime: formatIstDateTime,

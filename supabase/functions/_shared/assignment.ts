@@ -165,15 +165,27 @@ export function reminderEmailHtml(
   `;
 }
 
+export type GuardianHelperInfo = {
+  full_name: string;
+  phone: string;
+  photo_url?: string | null;
+};
+
+function helperPhotoHtml(helper: GuardianHelperInfo): string {
+  if (!helper.photo_url) return "";
+  return `<p><img src="${escapeHtml(helper.photo_url)}" alt="Helper photo" width="160" height="160" style="border-radius:12px;object-fit:cover;display:block;" /></p>`;
+}
+
 export function guardianNewHelperEmailHtml(
   request: RequestContact,
-  helper: { full_name: string; phone: string },
+  helper: GuardianHelperInfo,
 ): string {
   const { dateLabel, timeLabel } = appointmentLabels(request);
   return `
     <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937;">
       <p>Hi ${escapeHtml(request.booking_person_name)},</p>
       <p>Your new helper is <strong>${escapeHtml(helper.full_name)}</strong>, phone ${escapeHtml(helper.phone)}.</p>
+      ${helperPhotoHtml(helper)}
       <p>
         <strong>Patient:</strong> ${escapeHtml(request.parent_name)}<br />
         <strong>Date:</strong> ${escapeHtml(dateLabel)}<br />
@@ -187,13 +199,14 @@ export function guardianNewHelperEmailHtml(
 
 export function guardianHelperAssignedEmailHtml(
   request: RequestContact,
-  helper: { full_name: string; phone: string },
+  helper: GuardianHelperInfo,
 ): string {
   const { dateLabel, timeLabel } = appointmentLabels(request);
   return `
     <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937;">
       <p>Hi ${escapeHtml(request.booking_person_name)},</p>
       <p>A helper has been assigned for your appointment.</p>
+      ${helperPhotoHtml(helper)}
       <p>
         <strong>Helper:</strong> ${escapeHtml(helper.full_name)}<br />
         <strong>Helper phone:</strong> ${escapeHtml(helper.phone)}<br />
