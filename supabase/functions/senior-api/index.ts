@@ -1,6 +1,11 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient, type SupabaseClient } from "jsr:@supabase/supabase-js@2";
 import {
+  appointmentLabels,
+  formatRemaining,
+  guardianReplacementArrangingHtml,
+} from "../_shared/assignment.ts";
+import {
   escapeHtml,
   formatAppointmentDate,
   formatAppointmentTime,
@@ -9,9 +14,13 @@ import {
 import { resolveSecret, timingSafeEqual } from "../_shared/secrets.ts";
 import {
   approxDistanceLabel,
+  assignButtonHtml,
+  firstName,
+  formatRequestSummaryHtml,
   preferenceLabel,
   reasonPlain,
   RESPOND_BASE,
+  seniorAssignUrl,
 } from "../_shared/senior.ts";
 
 type ApiPayload = {
@@ -44,8 +53,13 @@ type RequestRow = {
   phone: string;
   created_at: string;
   assigned_helper_id: string | null;
+  assigned_at: string | null;
   senior_notified_at: string | null;
   guardian_arranging_sent_at: string | null;
+  helper_confirmed_at: string | null;
+  confirmed_by: string | null;
+  helper_dropped_at: string | null;
+  previous_helper_ids: string[] | null;
 };
 
 type HelperCandidate = {
@@ -61,6 +75,7 @@ type HelperCandidate = {
   within_range: boolean;
   gender_match: boolean;
   declined_before: boolean;
+  dropped_before: boolean;
   is_busy: boolean;
   busy_at: string | null;
   upcoming_assigned_jobs: number;
@@ -140,6 +155,9 @@ function buildWarnings(
   preference: string,
 ): string[] {
   const warnings: string[] = [];
+  if (helper.dropped_before) {
+    warnings.push("⚠ Dropped out of this request");
+  }
   if (!helper.gender_match) {
     const asked = preference === "female"
       ? "Female"
@@ -249,7 +267,7 @@ async function getRequestDetail(
   const { data: request, error } = await supabase
     .from("consultation_requests")
     .select(
-      "id, status, parent_name, parent_age, address_line1, street, area, landmark, city, pincode, appointment_date, appointment_time, doctor_hospital, helper_preference, needs_senior_reason, booking_person_name, relationship, email, phone_country_code, phone, created_at, assigned_helper_id, senior_notified_at, guardian_arranging_sent_at",
+      "id, status, parent_name, parent_age, address_line1, street, area, landmark, city, pincode, appointment_date, appointment_time, doctor_hospital, helper_preference, needs_senior_reason, booking_person_name, relationship, email, phone_country_code, phone, created_at, assigned_helper_id, assigned_at, senior_notified_at, guardian_arranging_sent_at, helper_confirmed_at, confirmed_by, helper_dropped_at, previous_helper_ids",
     )
     .eq("id", requestId)
     .maybeSingle();
@@ -274,8 +292,24 @@ async function getRequestDetail(
   if (helpersError) throw helpersError;
   if (offersError) throw offersError;
 
+  let assignedHelper: {
+    id: string;
+    full_name: string;
+    phone: string;
+    email: string;
+  } | null = null;
+  if (req.assigned_helper_id) {
+    const { data: helperRow } = await supabase
+      .from("helpers")
+      .select("id, full_name, phone, email")
+      .eq("id", req.assigned_helper_id)
+      .maybeSingle();
+    if (helperRow) assignedHelper = helperRow;
+  }
+
   const helpers = ((helpersRaw ?? []) as HelperCandidate[]).map((helper) => {
     const busyLabel = formatBusyAt(helper.busy_at);
+    const dropped = Boolean(helper.dropped_before);
     return {
       id: helper.helper_id,
       full_name: helper.full_name,
@@ -288,12 +322,13 @@ async function getRequestDetail(
       within_range: helper.within_range,
       gender_match: helper.gender_match,
       declined_before: helper.declined_before,
+      dropped_before: dropped,
       is_busy: helper.is_busy,
       busy_at: helper.busy_at,
       busy_label: busyLabel ? `Busy at ${busyLabel}` : null,
       upcoming_assigned_jobs: Number(helper.upcoming_assigned_jobs) || 0,
       warnings: buildWarnings(helper, req.helper_preference),
-      selectable: !helper.is_busy,
+      selectable: !helper.is_busy && !dropped,
     };
   });
 
@@ -333,10 +368,111 @@ async function getRequestDetail(
       relationship: req.relationship,
       phone: `${req.phone_country_code} ${req.phone}`.trim(),
       created_at: req.created_at,
+      assigned_helper_id: req.assigned_helper_id,
+      assigned_at: req.assigned_at,
+      helper_confirmed_at: req.helper_confirmed_at,
+      confirmed_by: req.confirmed_by,
+      helper_dropped_at: req.helper_dropped_at,
+      previous_helper_ids: req.previous_helper_ids ?? [],
+      assigned_helper: assignedHelper,
     },
     helpers,
     offer_history: history,
   };
+}
+
+async function notifyDropoutEmails(
+  supabase: SupabaseClient,
+  requestId: string,
+  helperId: string,
+  reasonLabel: string,
+) {
+  const [{ data: request }, { data: helper }] = await Promise.all([
+    supabase
+      .from("consultation_requests")
+      .select(
+        "id, parent_name, parent_age, area, pincode, appointment_date, appointment_time, doctor_hospital, helper_preference, needs_senior_reason, booking_person_name, email, address_line1, street, landmark, city",
+      )
+      .eq("id", requestId)
+      .maybeSingle(),
+    supabase
+      .from("helpers")
+      .select("id, full_name, phone")
+      .eq("id", helperId)
+      .maybeSingle(),
+  ]);
+  if (!request || !helper) return;
+
+  const seniorEmail = await resolveSecret(supabase, "SENIOR_EMAIL");
+  const accessKey = await resolveSecret(supabase, "SENIOR_ACCESS_KEY");
+  const { dateLabel, timeLabel } = appointmentLabels(request);
+  const patientFirst = firstName(request.parent_name);
+
+  if (seniorEmail && accessKey) {
+    const apptMs = Date.parse(
+      `${request.appointment_date}T${
+        String(request.appointment_time).slice(0, 8)
+      }+05:30`,
+    );
+    const remaining = Number.isFinite(apptMs)
+      ? formatRemaining(apptMs - Date.now())
+      : "soon";
+    const assignUrl = seniorAssignUrl(accessKey, requestId);
+    await sendEmail({
+      to: seniorEmail,
+      toName: "Senior coordinator",
+      subject:
+        `URGENT: ${helper.full_name} can’t attend – ${patientFirst}, ${dateLabel} ${timeLabel}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937;">
+          <p><strong>URGENT:</strong> ${escapeHtml(helper.full_name)} can’t attend – ${escapeHtml(patientFirst)}, ${escapeHtml(dateLabel)} ${escapeHtml(timeLabel)}</p>
+          <p><strong>Reason:</strong> ${escapeHtml(reasonLabel)}</p>
+          <p><strong>Time remaining:</strong> ${escapeHtml(remaining)}</p>
+          ${
+        formatRequestSummaryHtml({
+          parentName: request.parent_name,
+          parentAge: request.parent_age,
+          appointmentDate: request.appointment_date,
+          appointmentTime: request.appointment_time,
+          area: request.area,
+          pincode: request.pincode,
+          doctorHospital: request.doctor_hospital,
+          helperPreference: request.helper_preference,
+          reason: request.needs_senior_reason,
+        })
+      }
+          <p style="margin: 24px 0;">${assignButtonHtml(assignUrl)}</p>
+          <p>Warm regards,<br />ABI Parent Care</p>
+        </div>
+      `,
+    });
+  }
+
+  await sendEmail({
+    to: request.email,
+    toName: request.booking_person_name,
+    subject: `${firstName(helper.full_name)} is unable to attend – arranging replacement`,
+    html: guardianReplacementArrangingHtml(
+      {
+        parent_name: request.parent_name,
+        parent_age: request.parent_age,
+        address_line1: request.address_line1,
+        street: request.street,
+        area: request.area,
+        landmark: request.landmark,
+        city: request.city,
+        pincode: request.pincode,
+        appointment_date: request.appointment_date,
+        appointment_time: request.appointment_time,
+        doctor_hospital: request.doctor_hospital,
+        booking_person_name: request.booking_person_name,
+        relationship: "",
+        phone_country_code: "",
+        phone: "",
+      },
+      helper.full_name,
+    ),
+  });
 }
 
 async function sendSeniorOffer(
@@ -362,11 +498,13 @@ async function sendSeniorOffer(
   if (!helper) {
     return { ok: false, code: "helper_not_found", message: "Helper not found." };
   }
-  if (!helper.selectable || helper.is_busy) {
+  if (!helper.selectable) {
     return {
       ok: false,
-      code: "helper_busy",
-      message: helper.busy_label || "Helper is busy at this time.",
+      code: helper.dropped_before ? "helper_dropped_before" : "helper_busy",
+      message: helper.dropped_before
+        ? "This helper previously dropped out of this request."
+        : helper.busy_label || "Helper is busy at this time.",
     };
   }
 
@@ -397,6 +535,8 @@ async function sendSeniorOffer(
     code?: string;
     message?: string;
     offer_id?: string;
+    expiry_minutes?: number;
+    urgent?: boolean;
   };
 
   if (!result?.ok) {
@@ -430,8 +570,13 @@ async function sendSeniorOffer(
     phone: "",
     created_at: request.created_at,
     assigned_helper_id: null,
+    assigned_at: null,
     senior_notified_at: null,
     guardian_arranging_sent_at: null,
+    helper_confirmed_at: null,
+    confirmed_by: null,
+    helper_dropped_at: null,
+    previous_helper_ids: request.previous_helper_ids,
   } as RequestRow;
 
   const emailed = await sendOfferEmail(
@@ -449,6 +594,8 @@ async function sendSeniorOffer(
     emailed,
     helper_id: helperId,
     request_id: requestId,
+    expiry_minutes: result.expiry_minutes ?? 60,
+    urgent: Boolean(result.urgent),
   };
 }
 
@@ -509,8 +656,85 @@ Deno.serve(async (req: Request) => {
         );
       }
       const result = await sendSeniorOffer(supabase, requestId, helperId);
-      const status = result.ok ? 200 : result.code === "helper_busy" ? 409 : 400;
+      const status = result.ok
+        ? 200
+        : result.code === "helper_busy" || result.code === "helper_dropped_before"
+        ? 409
+        : 400;
       return jsonResponse(result, status);
+    }
+
+    if (action === "confirm_by_phone") {
+      const requestId = String(payload.request_id ?? "").trim();
+      if (!requestId) {
+        return jsonResponse({ ok: false, error: "request_id required" }, 400);
+      }
+      const { data, error } = await supabase.rpc("senior_confirm_helper", {
+        p_request_id: requestId,
+      });
+      if (error) throw error;
+      const result = data as {
+        ok?: boolean;
+        code?: string;
+        message?: string;
+      };
+      return jsonResponse({
+        ok: Boolean(result?.ok),
+        code: result?.code,
+        message: result?.message ?? "Unable to confirm.",
+      });
+    }
+
+    if (action === "helper_unable_reassign") {
+      const requestId = String(payload.request_id ?? "").trim();
+      if (!requestId) {
+        return jsonResponse({ ok: false, error: "request_id required" }, 400);
+      }
+
+      const { data: before } = await supabase
+        .from("consultation_requests")
+        .select("assigned_helper_id")
+        .eq("id", requestId)
+        .maybeSingle();
+      const helperId = before?.assigned_helper_id as string | null;
+      if (!helperId) {
+        return jsonResponse({
+          ok: false,
+          code: "not_assigned",
+          message: "Request is not currently assigned.",
+        }, 400);
+      }
+
+      const { data, error } = await supabase.rpc("release_assigned_helper", {
+        p_request_id: requestId,
+        p_reason: "helper_not_confirmed",
+        p_expected_helper_id: helperId,
+      });
+      if (error) throw error;
+      const result = data as {
+        ok?: boolean;
+        code?: string;
+        message?: string;
+        helper_id?: string;
+      };
+
+      if (result?.ok && result.helper_id) {
+        await notifyDropoutEmails(
+          supabase,
+          requestId,
+          result.helper_id,
+          "helper_not_confirmed",
+        );
+      }
+
+      return jsonResponse({
+        ok: Boolean(result?.ok),
+        code: result?.code,
+        message: result?.ok
+          ? "Helper released. Select a replacement below."
+          : result?.message ?? "Unable to release helper.",
+        request_id: requestId,
+      });
     }
 
     return jsonResponse({ ok: false, error: "Unknown action" }, 400);
